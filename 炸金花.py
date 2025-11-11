@@ -181,11 +181,11 @@ def compare_cardvalue(player1_card,player2_card):
         raise ValueError('出现了未知的牌形值')
 
 #建立牌形值与牌形的对应关系
-cardform_dict={1:'普通牌',2:'对子',3:'普通顺子',4:'同花',4.5:'小顺子',5:'同花顺',6:'豹子',2.5:'小顺子'}
+cardform_dict={1:'普通牌',2:'对子',3:'普通顺子',4:'同花',4.5:'小同花顺子',5:'同花顺',6:'豹子',2.5:'小顺子'}
 cardform_cn_player1=cardform_dict[get_cardform_value(player1_card)]        
 cardform_cn_player2=cardform_dict[get_cardform_value(player2_card)]
-print(f'玩家1的牌为【{player1_card[0][0]}{player1_card[0][1]}】，【{player1_card[1][0]}{player1_card[1][1]}】,【{player1_card[2][0]}{player1_card[2][1]}】，玩家1牌形为{cardform_cn_player1}')
-print(f'玩家2的牌为【{player2_card[0][0]}{player2_card[0][1]}】，【{player2_card[1][0]}{player2_card[1][1]}】,【{player2_card[2][0]}{player2_card[2][1]}】，玩家2牌形为{cardform_cn_player2}')
+print(f'玩家1的牌为【{player1_card[0][0]}{player1_card[0][1]}】，【{player1_card[1][0]}{player1_card[1][1]}】，【{player1_card[2][0]}{player1_card[2][1]}】，玩家1牌形为{cardform_cn_player1}')
+print(f'玩家2的牌为【{player2_card[0][0]}{player2_card[0][1]}】，【{player2_card[1][0]}{player2_card[1][1]}】，【{player2_card[2][0]}{player2_card[2][1]}】，玩家2牌形为{cardform_cn_player2}')
 #判断玩家1是否赢了
 result=compare_cardvalue(player1_card,player2_card)
 if result:
