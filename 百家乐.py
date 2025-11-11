@@ -6,6 +6,8 @@
 #5.判断玩家和庄家的牌面大小，大的为胜者
 import random
 import pygame
+import pygame_textinput as textin  # 导入 pygame-textinput 模块
+  # 创建一个文本输入框对象
 #定义颜色
 green=(0,128,0)
 #基础设置
@@ -13,10 +15,11 @@ pygame.font.init()  # 初始化字体，才能显示中文
 # 定义输入框需要的颜色
 WHITE = (255,255,255)
 GRAY = (200,200,200)  # 输入框激活时的背景色
-BLUE = (0,0,255)      # 输入框边框色
+BLUE = (0,0,210)      # 输入框边框色
 BLACK = (0,0,0)       # 输入框文字色
 # 字体：黑体、28号（支持中文）
 font = pygame.font.SysFont('SimHei', 28)
+textinput = textin.TextInputVisualizer(font_object=font)
 # 输入框相关变量
 input_active = 0  # 0=没激活，1=激活玩家1输入框，2=激活玩家2输入框
 input_text1 = ""  # 存玩家1输入的姓名
@@ -27,8 +30,8 @@ input2_rect = pygame.Rect(350, 110, 300, 40) # 玩家2输入框（在玩家1下�
 
 #窗口初始化
 pygame.init()
-screen_width=1000
-screen_height=600
+screen_width=1200
+screen_height=800
 
 screen=pygame.display.set_mode((screen_width,screen_height))  
 screen.fill(green)  
@@ -57,8 +60,8 @@ def card_init():
 cards=card_init()
 # print(cards)
 # print(len(cards))
-player1_name=input('请输入玩家1的姓名：')
-player2_name=input('请输入玩家2的姓名：')
+player1_name='玩家1'
+player2_name='玩家2'
 #3.洗牌，每人发两张牌
 random.shuffle(cards)
 player1=cards[0:2]
@@ -108,15 +111,20 @@ def reset_game():
         print(f'{player2_name}赢啦')
     else:
         print('平局')    
-    
+
+ #主循环   
 running=True
 while running:
-    for event in pygame.event.get():
+    events=pygame.event.get()
+    textinput.update(events) #这个要接收事件列表，才能处理键盘输入
+
+    for event in events:
         if event.type==pygame.QUIT:
             running=False
         if event.type==pygame.KEYDOWN and event.key==pygame.K_r:
             reset_game()
         # ========== 输入框交互逻辑（复制到 if event.type==pygame.QUIT: 下面）==========
+
 # 1. 鼠标点击：激活对应的输入框
         if event.type == pygame.MOUSEBUTTONDOWN:
             if input1_rect.collidepoint(event.pos):  # 点击玩家1输入框
@@ -147,7 +155,9 @@ while running:
                     input_text2 = input_text2[:-1]
                 else:
                     input_text2 += event.unicode    
+    
     screen.blit(player1_card1,player1_card1_pos)
+
     screen.blit(player1_card2,player1_card2_pos)
     screen.blit(player2_card1,player2_card1_pos)
     screen.blit(player2_card2,player2_card2_pos)
