@@ -6,27 +6,34 @@
 #5.判断玩家和庄家的牌面大小，大的为胜者
 import random
 import pygame
-import pygame_textinput as textin  # 导入 pygame-textinput 模块
-  # 创建一个文本输入框对象
+import pygame_gui as gui
+import pygame.freetype
+import deck
+from deck import card_load
+import sys
+import os
 #定义颜色
 green=(0,128,0)
 #基础设置
-pygame.font.init()  # 初始化字体，才能显示中文
+pygame.freetype.init()  # 初始化字体，才能显示中文
 # 定义输入框需要的颜色
 WHITE = (255,255,255)
 GRAY = (200,200,200)  # 输入框激活时的背景色
 BLUE = (0,0,210)      # 输入框边框色
 BLACK = (0,0,0)       # 输入框文字色
 # 字体：黑体、28号（支持中文）
-font = pygame.font.SysFont('SimHei', 28)
-textinput = textin.TextInputVisualizer(font_object=font)
+# font = pygame.font.SysFont('SimHei', 28)
+
+
 # 输入框相关变量
 input_active = 0  # 0=没激活，1=激活玩家1输入框，2=激活玩家2输入框
 input_text1 = ""  # 存玩家1输入的姓名
 input_text2 = ""  # 存玩家2输入的姓名
 # 输入框位置和大小（x,y,宽,高）
-input1_rect = pygame.Rect(350, 50, 300, 40)  # 玩家1输入框（中间偏上）
-input2_rect = pygame.Rect(350, 110, 300, 40) # 玩家2输入框（在玩家1下面）
+# input1_rect = pygame.Rect(350, 50, 300, 40)  # 玩家1输入框（中间偏上）
+# input2_rect = pygame.Rect(350, 110, 300, 40) # 玩家2输入框（在玩家1下面）
+
+
 
 #窗口初始化
 pygame.init()
@@ -34,17 +41,54 @@ screen_width=1200
 screen_height=800
 
 screen=pygame.display.set_mode((screen_width,screen_height))  
-screen.fill(green)  
+
 pygame.display.set_caption('百家乐')
-def card_load(card : tuple):
-    r,s=card
+
+# 确保pygame正确初始化字体系统
+pygame.init()
+pygame.font.init()
+pygame.freetype.init()
+
+# 尝试加载多个中文字体，确保至少有一个可用
+available_fonts = []
+font_candidates = ["SimHei", "Microsoft YaHei", "Arial", "simsun", "nsimsun", "SimSun-ExtB", "FangSong"]
+
+for font_name in font_candidates:
     try:
-        card_img=pygame.image.load(f'./cards/{rank_map[s]}_of_{suit_map[r]}.png')
-        scale_card_img=pygame.transform.scale(card_img,(100,150))
-        return scale_card_img
+        font = pygame.font.SysFont(font_name, 22)
+        # 测试字体是否能正确渲染中文
+        test_surface = font.render("测试", True, (255, 255, 255))
+        if test_surface.get_width() > 0:
+            available_fonts.append(font_name)
+            print(f"找到可用字体: {font_name}")
+            break  # 找到一个可用字体就可以了
     except:
-        print(f'没有{rank_map[r]} of {suit_map[s]}这张牌')
-        return None
+        continue
+
+# 如果没有找到可用的中文字体，打印警告
+if not available_fonts:
+    print("警告：未找到可用的中文字体，可能会影响中文显示")
+    available_fonts = ["Arial"]  # 默认使用Arial
+
+# 直接使用pygame_gui默认主题，但设置系统字体
+os.environ['SDL_FONT_FAMILY'] = available_fonts[0]
+
+# 初始化GUI管理器
+manager = gui.UIManager((screen_width, screen_height))
+
+# 玩家输入框
+player1_input = gui.elements.UITextEntryLine(
+    relative_rect=pygame.Rect((350, 50), (300, 40)),
+    manager=manager
+)
+player2_input = gui.elements.UITextEntryLine(
+    relative_rect=pygame.Rect((350, 110), (300, 40)),
+    manager=manager
+)
+
+
+
+#映射牌面，定义些规则下的牌面大小
 suit = ['黑桃', '红桃', '方片', '梅花']
 suit_map={'黑桃':'spades','红桃':'hearts','方片':'diamonds','梅花':'clubs'}
 rank = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
@@ -66,15 +110,18 @@ player2_name='玩家2'
 random.shuffle(cards)
 player1=cards[0:2]
 del cards[0:2]
-player1_card1=card_load(player1[0])
-player1_card2=card_load(player1[1])
 
 player2=cards[0:2]
 del cards[0:2]
 
+#4.把牌面图片导入缓存
+player1_card1=card_load(player1[0])
+player1_card2=card_load(player1[1])
 player2_card1=card_load(player2[0])
 player2_card2=card_load(player2[1])
-player1_card1_pos=(screen_width//2-100,screen_height//2-150)
+
+#5.定义牌面图片位置
+player1_card1_pos=(screen_width//2-100,screen_height//2-150) #//代表向下整除
 player1_card2_pos=(screen_width//2+100,screen_height//2-150)
 player2_card1_pos=(screen_width//2-100,screen_height//2+100)
 player2_card2_pos=(screen_width//2+100,screen_height//2+100)
@@ -114,76 +161,61 @@ def reset_game():
 
  #主循环   
 running=True
+clock = pygame.time.Clock()
+
+# 创建标签
+player1_label = gui.elements.UILabel(
+    relative_rect=pygame.Rect((220, 50), (120, 40)),
+    text="玩家1姓名：",
+    manager=manager
+)
+
+player2_label = gui.elements.UILabel(
+    relative_rect=pygame.Rect((220, 110), (120, 40)),
+    text="玩家2姓名：",
+    manager=manager
+)
+
 while running:
+    time_delta = clock.tick(60) / 1000.0
     events=pygame.event.get()
-    textinput.update(events) #这个要接收事件列表，才能处理键盘输入
 
     for event in events:
+        # 将事件传递给GUI管理器
+        manager.process_events(event)
+        
         if event.type==pygame.QUIT:
             running=False
         if event.type==pygame.KEYDOWN and event.key==pygame.K_r:
             reset_game()
-        # ========== 输入框交互逻辑（复制到 if event.type==pygame.QUIT: 下面）==========
-
-# 1. 鼠标点击：激活对应的输入框
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if input1_rect.collidepoint(event.pos):  # 点击玩家1输入框
-                input_active = 1
-            elif input2_rect.collidepoint(event.pos):  # 点击玩家2输入框
-                input_active = 2
-            else:  # 点击其他地方，取消激活
-                input_active = 0
-
-        # 2. 键盘输入：处理姓名输入
+        
+        # 处理输入事件
         if event.type == pygame.KEYDOWN:
-            # 处理玩家1输入
-            if input_active == 1:
-                if event.key == pygame.K_RETURN:  # 按回车，确认玩家1姓名
-                    if input_text1.strip() != "":  # 确保输入不为空
-                        player1_name = input_text1.strip()  # 把输入的文字赋值给player1_name
-                elif event.key == pygame.K_BACKSPACE:  # 按退格，删除最后一个字
-                    input_text1 = input_text1[:-1]
-                else:  # 输入文字（支持中文）
-                    input_text1 += event.unicode  # 把按键文字加到input_text1里
-
-            # 处理玩家2输入（和玩家1逻辑一样）
-            elif input_active == 2:
-                if event.key == pygame.K_RETURN:
-                    if input_text2.strip() != "":
-                        player2_name = input_text2.strip()
-                elif event.key == pygame.K_BACKSPACE:
-                    input_text2 = input_text2[:-1]
-                else:
-                    input_text2 += event.unicode    
+            # 当输入框有焦点且按下回车键时
+            if event.key == pygame.K_RETURN:
+                # 检查哪个输入框有焦点
+                if player1_input.is_focused:
+                    if player1_input.get_text().strip() != "":
+                        player1_name = player1_input.get_text().strip()
+                        print(f"玩家1姓名已设置为: {player1_name}")
+                elif player2_input.is_focused:
+                    if player2_input.get_text().strip() != "":
+                        player2_name = player2_input.get_text().strip()
+                        print(f"玩家2姓名已设置为: {player2_name}")
     
-    screen.blit(player1_card1,player1_card1_pos)
-
-    screen.blit(player1_card2,player1_card2_pos)
-    screen.blit(player2_card1,player2_card1_pos)
-    screen.blit(player2_card2,player2_card2_pos)
-    # 1. 画玩家1输入框
-    if input_active == 1:  # 如果激活，背景变灰色
-        pygame.draw.rect(screen, GRAY, input1_rect)
-    else:  # 没激活，背景白色
-        pygame.draw.rect(screen, WHITE, input1_rect)
-    pygame.draw.rect(screen, BLUE, input1_rect, 2)  # 输入框边框（蓝色）
-    # 画玩家1输入的文字
-    text1 = font.render(input_text1, True, BLACK)
-    screen.blit(text1, (input1_rect.x + 10, input1_rect.y + 5))  # 文字在输入框内
-    # 玩家1输入提示（左边的“玩家1姓名：”）
-    hint1 = font.render("玩家1姓名：", True, WHITE)
-    screen.blit(hint1, (220, 55))  # 提示文字位置
-
-    # 2. 画玩家2输入框（和玩家1逻辑一样）
-    if input_active == 2:
-        pygame.draw.rect(screen, GRAY, input2_rect)
-    else:
-        pygame.draw.rect(screen, WHITE, input2_rect)
-    pygame.draw.rect(screen, BLUE, input2_rect, 2)
-    text2 = font.render(input_text2, True, BLACK)
-    screen.blit(text2, (input2_rect.x + 10, input2_rect.y + 5))
-    # 玩家2输入提示
-    hint2 = font.render("玩家2姓名：", True, WHITE)
-    screen.blit(hint2, (220, 115))
-
+    # 更新GUI管理器
+    manager.update(time_delta)
+    
+    # 绘制背景
+    screen.fill(green)
+    
+    # 绘制玩家1和玩家2的牌面图片
+    screen.blit(player1_card1, player1_card1_pos)
+    screen.blit(player1_card2, player1_card2_pos)
+    screen.blit(player2_card1, player2_card1_pos)
+    screen.blit(player2_card2, player2_card2_pos)
+    
+    # 绘制GUI元素
+    manager.draw_ui(screen)
+    
     pygame.display.flip()
