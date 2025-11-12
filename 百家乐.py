@@ -6,7 +6,6 @@
 #5.判断玩家和庄家的牌面大小，大的为胜者
 import random
 import pygame
-import pygame_gui as gui
 import pygame.freetype
 import deck
 from deck import card_load
@@ -29,9 +28,14 @@ BLACK = (0,0,0)       # 输入框文字色
 input_active = 0  # 0=没激活，1=激活玩家1输入框，2=激活玩家2输入框
 input_text1 = ""  # 存玩家1输入的姓名
 input_text2 = ""  # 存玩家2输入的姓名
-# 输入框位置和大小（x,y,宽,高）
-# input1_rect = pygame.Rect(350, 50, 300, 40)  # 玩家1输入框（中间偏上）
-# input2_rect = pygame.Rect(350, 110, 300, 40) # 玩家2输入框（在玩家1下面）
+#输入框位置和大小（x,y,宽,高），现在先放外面，后续如果要消失，得放主循环里面
+input1_rect = pygame.Rect(350, 50, 300, 40)  # 玩家1输入框（中间偏上）
+input2_rect = pygame.Rect(350, 110, 300, 40) # 玩家2输入框（在玩家1下面）
+#输入框边上的标签
+input1_label = font.render('请输入玩家1姓名:', True, BLACK)
+input2_label = font.render('请输入玩家2姓名:', True, BLACK)
+input2_label_pos=(input2_rect.x-150,input2_rect.y)
+input1_label_pos=(input1_rect.x-150,input1_rect.y)
 
 
 
@@ -49,42 +53,12 @@ pygame.init()
 pygame.font.init()
 pygame.freetype.init()
 
-# 尝试加载多个中文字体，确保至少有一个可用
-available_fonts = []
-font_candidates = ["SimHei", "Microsoft YaHei", "Arial", "simsun", "nsimsun", "SimSun-ExtB", "FangSong"]
 
-for font_name in font_candidates:
-    try:
-        font = pygame.font.SysFont(font_name, 22)
-        # 测试字体是否能正确渲染中文
-        test_surface = font.render("测试", True, (255, 255, 255))
-        if test_surface.get_width() > 0:
-            available_fonts.append(font_name)
-            print(f"找到可用字体: {font_name}")
-            break  # 找到一个可用字体就可以了
-    except:
-        continue
-
-# 如果没有找到可用的中文字体，打印警告
-if not available_fonts:
-    print("警告：未找到可用的中文字体，可能会影响中文显示")
-    available_fonts = ["Arial"]  # 默认使用Arial
-
-# 直接使用pygame_gui默认主题，但设置系统字体
-os.environ['SDL_FONT_FAMILY'] = available_fonts[0]
-
-# 初始化GUI管理器
-manager = gui.UIManager((screen_width, screen_height))
-
+font_path='MSYH.TTC'
+font = pygame.freetype.Font(font_path, 28)
+large_font = pygame.freetype.Font(font_path, 48)
 # 玩家输入框
-player1_input = gui.elements.UITextEntryLine(
-    relative_rect=pygame.Rect((350, 50), (300, 40)),
-    manager=manager
-)
-player2_input = gui.elements.UITextEntryLine(
-    relative_rect=pygame.Rect((350, 110), (300, 40)),
-    manager=manager
-)
+
 
 
 
@@ -94,26 +68,14 @@ suit_map={'黑桃':'spades','红桃':'hearts','方片':'diamonds','梅花':'club
 rank = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 rank_map={'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':'jack','Q':'queen','K':'king','A':'ace'}
 
-def card_init():
-    cards = []
-    for s in suit:
-        for r in rank:
-            card=(s,r)
-            cards.append(card)
-    return cards
-cards=card_init()
-# print(cards)
-# print(len(cards))
+deck=deck.Deck() #创建牌堆
+deck.shuffle() #洗牌
+
 player1_name='玩家1'
 player2_name='玩家2'
 #3.洗牌，每人发两张牌
-random.shuffle(cards)
-player1=cards[0:2]
-del cards[0:2]
-
-player2=cards[0:2]
-del cards[0:2]
-
+player1=deck.deal(2)
+player2=deck.deal(2)
 #4.把牌面图片导入缓存
 player1_card1=card_load(player1[0])
 player1_card2=card_load(player1[1])
@@ -162,19 +124,6 @@ def reset_game():
  #主循环   
 running=True
 clock = pygame.time.Clock()
-
-# 创建标签
-player1_label = gui.elements.UILabel(
-    relative_rect=pygame.Rect((220, 50), (120, 40)),
-    text="玩家1姓名：",
-    manager=manager
-)
-
-player2_label = gui.elements.UILabel(
-    relative_rect=pygame.Rect((220, 110), (120, 40)),
-    text="玩家2姓名：",
-    manager=manager
-)
 
 while running:
     time_delta = clock.tick(60) / 1000.0
