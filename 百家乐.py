@@ -54,48 +54,50 @@ if os.path.exists(font_path):
 font = pygame.freetype.Font(font_path, 28)
 large_font = pygame.freetype.Font(font_path, 48)
 
-# #render(
-#     text,          # 必选：要渲染的文字（字符串，支持中文）
-#     fgcolor,       # 必选：文字颜色（RGB元组，比如 (0,0,0) 黑色）
-#     bgcolor=None,  # 可选：文字背景色（默认透明）
-#     style=0,       # 可选：文字样式（加粗、斜体等，默认正常）
-#     rotation=0,    # 可选：旋转角度（默认0度，不旋转）
-#     size=0         # 可选：强制指定字号（默认0=用创建字体时的字号）
-# ) render 的参数说明，抗锯齿不在这里，是创建对象的时候设置的，浪费我大量时间
-#输入框边上的标签，直接渲染了。
+# 玩家输入框边上的标签
 input1_label,input1_label_rect = font.render('请输入玩家1姓名:', WHITE)
 input2_label,input2_label_rect = font.render('请输入玩家2姓名:', WHITE)
 input2_label_pos=(input2_rect.x-250,input2_rect.y+5)
 input1_label_pos=(input1_rect.x-250,input1_rect.y+5)
+# 开始游戏按钮
 
+class Button:
+    def __init__(self,text,pos,font,color=WHITE,bg_color=BLUE):
+        self.text=text
+        self.pos=pos
+        self.font=font
+        self.color=color
+        self.bg_color=bg_color
+        _,text_rect=font.render(text,color) #渲染了一个矩形获取文字的宽高
+        text_width,text_height=text_rect.size
+        self.rect=pygame.Rect(pos[0],pos[1],text_width+20,text_height+10)#把Rect实例作为self的属性。
+        #Rect的参数是（x,y,width,height）
+        #Rect的属性可以通过self.rect.x,self.rect.y,self.rect.width,self.rect.height来访问和修改
+    def draw(self,screen): #绘制按钮的方法
+        pygame.draw.rect(screen,self.bg_color,self.rect) #rect矩形对象绘制，参数是（surface,color,rect）
+        self.font.render_to(screen,self.pos,self.text,self.color)
+    def click(self,pos):
+        if self.rect.collidepoint(pos):
+            return True
+        else:
+            return False
 
-# 玩家输入框
-
-
-
-
+start_button=Button('开始游戏',(screen_width//2+350,screen_height//2-100 ),large_font)
+start_status=False #未开始
+next_button=Button('下一局游戏',(screen_width//2+350,screen_height//2-100),large_font)
+reset_button=Button('重置游戏',(screen_width//2+350,screen_height//2+50),large_font)
 #映射牌面，定义些规则下的牌面大小
 suit = ['黑桃', '红桃', '方片', '梅花']
 suit_map={'黑桃':'spades','红桃':'hearts','方片':'diamonds','梅花':'clubs'}
 rank = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 rank_map={'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':'jack','Q':'queen','K':'king','A':'ace'}
 
-deck=d.Deck() #创建牌堆
-deck.shuffle() #洗牌
+
 #初始设置
 player1_name='玩家1'
 player2_name='玩家2'
 
-#3.洗牌，每人发两张牌
-player1=deck.deal(2)
-player2=deck.deal(2)
-#4.把牌面图片导入缓存
-player1_card1=card_load(player1[0])
-player1_card2=card_load(player1[1])
-player2_card1=card_load(player2[0])
-player2_card2=card_load(player2[1])
-
-#5.定义牌面图片位置
+#5.定义牌面图片位置，常量，不变
 player1_card1_pos=(screen_width//2-100,screen_height//2-150) #//代表向下整除
 player1_card2_pos=(screen_width//2+100,screen_height//2-150)
 player2_card1_pos=(screen_width//2-100,screen_height//2+100)
@@ -103,38 +105,41 @@ player2_card2_pos=(screen_width//2+100,screen_height//2+100)
 
 #4.判断玩家和庄家的牌面大小
 rank_value={'1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':0,'J':0,'Q':0,'K':0,'A':1}
-player1_value=(rank_value[player1[0][1]]+rank_value[player1[1][1]])%10
-player2_value=(rank_value[player2[0][1]]+rank_value[player2[1][1]])%10
-print(f'{player1_name}的牌为{player1[0][0]}{player1[0][1]}和{player1[1][0]}{player1[1][1]},{player1_name}的牌面大小为{player1_value},{player2_name}的牌为{player2[0][0]}{player2[0][1]}和{player2[1][0]}{player2[1][1]},{player2_name}的牌面大小为{player2_value}')
-#5.判断玩家和庄家的牌面大小，大的为胜者
-if player1_value>player2_value:
-    print(f'{player1_name}赢啦')
-elif player1_value<player2_value:
-    print(f'{player2_name}赢啦')
-else:
-    print('平局')
 
-#重置游戏
-def reset_game():
-    global rank_value,player1,player2,player1_card1,player1_card2,player2_card1,player2_card2,deck,player1_name,player2_name,player1_value,player2_value
+count=0
+player1_win=0 #记录玩家1赢的次数
+player2_win=0 #记录玩家2赢的次数
+result_text=''
+#开始游戏
+def start_game():
+    global result_text,player1_win,player2_win,player1,player2,player1_card1,player1_card2,player2_card1,player2_card2,deck,player1_name,player2_name,player1_value,player2_value
     deck=d.Deck()
     deck.shuffle()
     
+    
+
+#发牌，每人发两张牌
     player1=deck.deal(2)
     player2=deck.deal(2)
     player1_value=(rank_value[player1[0][1]]+rank_value[player1[1][1]])%10
     player2_value=(rank_value[player2[0][1]]+rank_value[player2[1][1]])%10
-    
+
+#渲染，每次发牌都要渲染一次牌面图片，因为有变化 
     player1_card1=card_load(player1[0])
     player1_card2=card_load(player1[1])
     player2_card1=card_load(player2[0])
     player2_card2=card_load(player2[1])
     if player1_value>player2_value:
         print(f'{player1_name}赢啦')
+        player1_win+=10
+        result_text=f'{player1_name}赢啦'
     elif player1_value<player2_value:
         print(f'{player2_name}赢啦')
+        player2_win+=10
+        result_text=f'{player2_name}赢啦'
     else:
         print('平局')    
+        result_text='平局'  
 
  #主循环   
 running=True
@@ -164,10 +169,21 @@ while running:
                 
             else:
                 input_active = 0  # 点击了其他地方，取消激活状态
+
+            if start_button.click(event.pos) and start_status==False:
+                start_status=True
+                start_game()
+            if next_button.click(event.pos) and start_status==True:
+                start_game()
+            if reset_button.click(event.pos) and start_status==True:
+                player1_win=0
+                player2_win=0
+                result_text=''
+                start_status=False
         # 处理输入事件
         if event.type == pygame.KEYDOWN:
             # 当输入框有焦点且按下回车键时
-            if event.key == pygame.K_RETURN:
+            if event.key == pygame.K_RETURN and start_status==False:
                 # 检查哪个输入框有焦点
                 if input_active==1:
                     if input_text1.strip() != "":
@@ -209,23 +225,30 @@ while running:
 
     # 绘制背景
     screen.fill(green)
-    #绘制输入框，根据是否有焦点来绘制不同的颜色
-    if input_active==1:
-        pygame.draw.rect(screen, GRAY, input1_rect,border_radius=10)
-    else:
-        pygame.draw.rect(screen, WHITE, input1_rect,border_radius=10)
-    if input_active==2:
-        pygame.draw.rect(screen, GRAY, input2_rect,border_radius=10)    
-    else:
-        pygame.draw.rect(screen, WHITE, input2_rect,border_radius=10)
+   
+    
+    if start_status==False: #未开始状态
+        start_button.draw(screen) #显示开始按钮
+    if start_status==True: #游戏开始后，绘制下一局按钮
+        next_button.draw(screen) #显示下一局按钮
+        reset_button.draw(screen) #显示重置按钮
+    if start_status==False: #未开始状态，绘制玩家姓名输入框
+        if input_active==1:
+            pygame.draw.rect(screen, GRAY, input1_rect,border_radius=10)
+        else:
+            pygame.draw.rect(screen, WHITE, input1_rect,border_radius=10)
+        if input_active==2:
+            pygame.draw.rect(screen, GRAY, input2_rect,border_radius=10)    
+        else:
+            pygame.draw.rect(screen, WHITE, input2_rect,border_radius=10)
 
     # 渲染并绘制输入框中的文本
-    font.render_to(screen, (input1_rect.x+5, input1_rect.y+5), input_text1, BLACK)
-    font.render_to(screen, (input2_rect.x+5, input2_rect.y+5), input_text2, BLACK)
+        font.render_to(screen, (input1_rect.x+5, input1_rect.y+5), input_text1, BLACK)
+        font.render_to(screen, (input2_rect.x+5, input2_rect.y+5), input_text2, BLACK)
 
     # 绘制输入框边上的标签
-    screen.blit(input1_label, input1_label_pos)
-    screen.blit(input2_label, input2_label_pos)
+        screen.blit(input1_label, input1_label_pos)
+        screen.blit(input2_label, input2_label_pos)
     # 渲染玩家姓名
     player1_name=player1_name if player1_name else "玩家1"
     player2_name=player2_name if player2_name else "玩家2"
@@ -233,17 +256,29 @@ while running:
     player2_name_text,player2_name_rect = large_font.render(player2_name,  WHITE)
     player1_name_pos=(player1_card1_pos[0]+450, player1_card1_pos[1]-200)
     player2_name_pos=(player2_card1_pos[0]-200, player2_card1_pos[1]+100)    
+    #分数框
+   
+
     # 绘制玩家姓名
     screen.blit(player1_name_text, player1_name_pos)
     screen.blit(player2_name_text, player2_name_pos)    
 
     # 绘制玩家1和玩家2的牌面图片
-    screen.blit(player1_card1, player1_card1_pos)
-    screen.blit(player1_card2, player1_card2_pos)
-    screen.blit(player2_card1, player2_card1_pos)
-    screen.blit(player2_card2, player2_card2_pos)
-    
-    font.render_to(screen, (200, 200), f'{player1_name}的牌面大小为{player1_value}', BLACK)
-    font.render_to(screen, (200, 300), f'{player2_name}的牌面大小为{player2_value}', BLACK)
+    if start_status==True:
+        screen.blit(player1_card1, player1_card1_pos)
+        screen.blit(player1_card2, player1_card2_pos)
+        screen.blit(player2_card1, player2_card1_pos)
+        screen.blit(player2_card2, player2_card2_pos)
+    # 绘制结果文字
+    result_text_surface,result_text_rect=large_font.render(result_text,WHITE)
+    result_text_pos=(500,100)
+    screen.blit(result_text_surface,result_text_pos)
+
+    #分数实时更新
+    if start_status==True:
+        large_font.render_to(screen, (player1_name_pos[0], player1_name_pos[1]-50), f'{player1_win}分', WHITE)
+        large_font.render_to(screen, (player2_name_pos[0], player2_name_pos[1]-50), f'{player2_win}分', WHITE)
+    # font.render_to(screen, (200, 200), f'{player1_name}的牌面大小为{player1_value}', BLACK)
+    # font.render_to(screen, (200, 300), f'{player2_name}的牌面大小为{player2_value}', BLACK)
 
     pygame.display.flip()
