@@ -6,10 +6,13 @@
 #6.分数系统，每人初始100分，地主赢一局加2分，输一局减2分。
 #7.AI出牌逻辑：自己出优先出单张。别人出，有大牌就压。
 #可视化：牌桌上显示当前在出的牌，玩家手中看到自己的牌，叠放。其他人的牌只显示背面。显示：开始按钮，下一局按钮。分数，出版记录。
+from termios import FF0
 import pygame
 import deck as d
 import pygame.freetype
 from collections import Counter
+from itertools import combinations
+
 #定义常量
 #定义颜色
 green=(0,128,0)
@@ -43,22 +46,32 @@ suit_value={
     "梅花":1,"方块":2,"红心":3,"黑桃":4,'小':5,'大':6, #大小王的比较
 }
 cardtype={
-    '单张':1,'对子':2,'三不带牌':3,'三带1':4,'三带2':5,'顺子':6,'连对':7,'四带二':8,'飞机不带牌':9,'飞机各带1张':10,'飞机各带2张':11,'三架飞机不带牌':12,'三架飞机各带1':13,'三架飞机各带2':14,'炸弹':100,'王炸':200
+    '单张':'单张','对子':'对子','三不带牌':'三不带牌','三带1':'三带1','三带2':'三带2','顺子':'顺子','连对':'连对','四带二':'四带二','八带四':'八带四','飞机不带牌':'飞机不带牌','飞机各带1张':'飞机各带1张','飞机各带2张':'飞机各带2张','三架飞机不带牌':'三架飞机不带牌','三架飞机各带1':'三架飞机各带1','三架飞机各带2':'三架飞机各带2','炸弹':100,'王炸':200
 }
-cardtype_value=0 #0代表无牌型，不能出牌
-def getcardtype(cards:list):
-    
-    global cardtype_value
+#用一个字典记录牌局状态
+game_status={
+    'player1_in_hand':[],
+    'player2_in_hand':[],
+    'player3_in_hand':[],
+    'middle_cards':[],
+    'landlord':None,
+    'last_played_cards':None, #上一个回合出的牌
+}
+
+#工具函数，判断牌型
+def getcardtype(cards:list): #定义牌形识别函数
+    #定义工具函数
+    cardtype_value
     #判断是否是顺子的函数
     def is_straight():
         for i in range(len(cards)-1):
             if rank_value[cards[i][1]]!=rank_value[cards[i+1][1]]+1:
                 return False
         return True
-    def is_consecutive_pairs(len): #判断是否是连对的函数
-        if len%2!=0:
+    def is_consecutive_pairs(): #判断是否是连对的函数
+        if len(cards)%2!=0:
             return False #连对必须是偶数张
-        for i in range(len//2):
+        for i in range(len(cards)//2):
             n=i*2
             #首先判断是对子组合
             if rank_value[cards[n][1]]!=rank_value[cards[n+1][1]]:
@@ -68,8 +81,21 @@ def getcardtype(cards:list):
             #判断对子是否连续
             elif rank_value[cards[n][1]]!=rank_value[cards[n+2][1]]+1:
                 return False
-           
         return True
+    def is_quadruple(): #判断是否是四带2的函数，如果是，返回四带2的类型，如果不是，返回False
+        if len(cards)%6!=0:
+            return False #四带2必须是6的倍数
+        count=Counter([card[1] for card in cards]) #统计每个牌值出现的次数，这是一个字典
+        #判断是否有4个牌值出现次数等于4次
+        list4=[k for k,v in count.items() if v==4]
+        list4.sort(reverse=True) #将字典的值转换为列表，只保留出现次数等于4的牌值
+        if len(list4)==1:
+            return cardtype['四带二']
+        if len(list4)==2 and list4[0]==list4[1]+1:
+            return cardtype['八带四']
+       
+         
+       
     def is_airplane(): #判断是否是飞机的函数，如果是，返回飞机的类型，如果不是，返回False
       cardvalues=[rank_value[card[1]] for card in cards]
       count=Counter[int](cardvalues) #统计每个牌值出现的次数，这是一个字典
@@ -112,60 +138,225 @@ def getcardtype(cards:list):
           else:
               return False
               #先暂定最多三架飞机吧。
-      
-     
+     #判断前者能否压后者牌的函数 
+    
 
     #函数主体：
     #先把cards按牌值从大到小排序，方便后续判断
     cards.sort(key=lambda x:rank_value[x[1]],reverse=True)
     if len(cards)==1:
-        cardtype_value=cardtype['单张']
+        return cardtype['单张']
     elif len(cards)==2:
         if cards[0][1]==cards[1][1] and cards[0][1]!='王':
-            cardtype_value=cardtype['对子']
+            return cardtype['对子']
         elif cards[0][1]=='王' and cards[1][1]=='王':
-            cardtype_value=cardtype['王炸']
+            return cardtype['王炸']
         else:
-            cardtype_value=0
+            return 0
     elif len(cards)==3:
         if cards[0][1]==cards[1][1]==cards[2][1]:
-            cardtype_value=cardtype['三不带牌']
+            return cardtype['三不带牌']
         else:
-            cardtype_value=0
+            return 0
     elif len(cards)==4:
         if cards[0][1]==cards[1][1]==cards[2][1]==cards[3][1]:
-            cardtype_value=cardtype['炸弹']
+            return cardtype['炸弹']
         elif cards[0][1]==cards[1][1]==cards[2][1] or cards[0][1]==cards[1][1]==cards[3][1] or cards[0][1]==cards[2][1]==cards[3][1] or cards[1][1]==cards[3][1]==cards[2][1]:
-            cardtype_value=cardtype['三带1']
+            return cardtype['三带1']
         else:
-            cardtype_value=0
+            return 0
     elif len(cards)==5:
         #先判断是否是顺子,5张只能是顺子或三带二
 
         if is_straight():
-            cardtype_value=cardtype['顺子']
+            return cardtype['顺子']
         elif cards[0][1]==cards[1][1] and cards[2][1]==cards[3][1]==cards[4][1] or cards[0][1]==cards[1][1] == cards[2][1] and cards[3][1]==cards[4][1]:
-            cardtype_value=cardtype['三带二']
+            return cardtype['三带二']
         else:
-            cardtype_value=0
-    elif len(cards) >=6:
-      if is_straight():
-            cardtype_value=cardtype['顺子']
-       
-      if is_consecutive_pairs(len(cards)):
-            cardtype_value=cardtype['连对']
+            return 0
+    elif len(cards) >=6: #6张以上的牌，只能是顺子、连对、飞机或四带二
+        if is_straight():
+            return cardtype['顺子']
+         
+        if is_consecutive_pairs(len(cards)):
+            return cardtype['连对']
+        if is_airplane():
+            return is_airplane() #如果是飞机，返回飞机的类型
+        elif is_quadruple(): #如果是四带二，返回四带二
+            return is_quadruple()
+        else:
+            return 0 #如果不是以上的牌型，那么就是错误的牌型
 
-        else:
-            cardtype_value=0
-        for i in range(4):
-            if rank_value[cards[i][1]]!=rank_value[cards[i+1][1]]-2:
-                cardtype_value=0
-                break
-        if is_consecutive_pairs:
-            cardtype_value=cardtype['连对']
-        else:
-            cardtype_value=0
+
+def can_beat(current_cards:list,last_played_cards:list=None) -> bool:
+        if last_played_cards==None: #如果是第一个回合，那么可以出任意牌
+            return True
+        cur=getcardtype(current_cards)
+        last=getcardtype(last_played_cards)
+        if cur==200: #如果是王炸，绝对比他大
+            return True
+        if last==200: #如果对方是王炸，绝对比他小
+            return False
+        if cur==100 and last!=100: #如果是炸弹，绝对比他大
+            return True
+        #同级比较
+        if cur!=last: #牌型不同无法压
+            return False
+        if cur==last: #如果牌型相同，那么比较牌值
+            if cur=='单张' and rank_value[current_cards[0][1]]==rank_value[last_played_cards[0][1]]==20:
+                if current_cards[0][0]=='大': #如果是大小王比较
+                    return True
+                return False
+            if cur=='单张' and rank_value[current_cards[0][1]]!=rank_value[last_played_cards[0][1]]:
+                return rank_value[current_cards[0][1]]>rank_value[last_played_cards[0][1]]
+            if cur=='对子': 
+                return rank_value[current_cards[0][1]]>rank_value[last_played_cards[0][1]]
+            if cur=='三不带牌':
+                return rank_value[current_cards[0][1]]>rank_value[last_played_cards[0][1]]
+            if cur=='三带1':
+                count1=Counter([card[1] for card in current_cards]) #数每个值，返回字典
+                count2=Counter([v for k,v in last_played_cards ])
+                #解包字典，取出最大的牌值
+                max1=count1.most_common(1)[0][0]
+                max2=count2.most_common(1)[0][0]
+                return rank_value[max1]>rank_value[max2]
+            if cur=='三带2' or cur=='四带2' or cur=='八带四' or cur=='飞机不带牌' or cur=='飞机各带1张' or cur=='飞机各带2张' or cur=='三架飞机不带牌' or cur=='三架飞机各带2':
+                count1=Counter([card[1] for card in current_cards]) #数每个值，返回字典
+                count2=Counter([v for k,v in last_played_cards ])
+                #解包字典，取出最大的牌值
+                max1=count1.most_common(1)[0][0]
+                max2=count2.most_common(1)[0][0]
+                return rank_value[max1]>rank_value[max2]
+            if cur=='顺子' or cur=='连对':
+               if len(current_cards)!=len(last_played_cards):
+                    return False
+               else:
+                    max1=current_cards.sort(key=lambda x:rank_value[x[1]],reverse=True)[0][1]
+                    max2=last_played_cards.sort(key=lambda x:rank_value[x[1]],reverse=True)[0][1]
+                    return rank_value[max1]>rank_value[max2]
+def possible_cards() -> list: #不用传参，参数是固定的，自己的牌和牌桌上的牌,可以直接调用
+        #按照类型筛选出可以出的牌，要针对对方打出的牌的类型
+        last=game_status['last_played_cards']
+        #如果对方是王炸,出不了牌
+        if getcardtype(last)==200:
+            return False
+        #如果对方是炸弹，那么只能出炸弹
+        if getcardtype(last)==100:
+
+            combo=combinations(current_cards,4) #从当前牌中选出4张牌
+            #筛选出炸弹
+            combo=[list(card) for card in combo if getcardtype(list(card))=='炸弹'] #每个元素是元组，先转化成列表。
+            return combo
+        #如果对方是单张，那么只能出单张
+        if getcardtype(last)=='单张':
+            return [card for card in current_cards if getcardtype([card])=='单张']
+        #如果对方是对子，那么只能出对子
+        if getcardtype(last)=='对子':
+            return [card for card in current_cards if getcardtype([card])=='对子']
+        #按照类型筛选出可以出的牌，要针对对方打出的牌
+
+        return [card for card in current_cards if can_beat([card],last_played_cards)]
+        
+
+#游戏主体       
 def start_game():
-    deck=d.DeckwithJoker()
-    print(deck.cards)
+    class Player: #把玩家的属性和方法封装在一个类中
+        def __init__(self,player_id):
+            self.player_id=player_id
+            self.in_hand=[] #玩家手中的牌
+            self.playing_cards=[] #正在选的牌，准备出
+            self.played_cards=[] #刚刚出的牌,已经出过的牌，在牌桌上
+            self.landlord=False #是否是地主,默认不是
+            self.turn=False #是否是出牌回合,默认不是
+        #定义回合
+        def play_turn(self): #出牌
+            self.out_card(self.played_cards)
+        #回合开始，切换到出牌回合
+        #判断自己选的牌是否比last_played_cards大
+
+        def start_turn(self): #开始自己的回合,并选择要出的牌
+            self.turn=True #切换到出牌回合
+            while self.turn==True:
+               print(f'玩家{self.player_id}请选择要出的牌，')
+               #先模拟随便出牌，筛选出可以出的牌
+               possible_cards=[card for card in self.in_hand if can_beat([card],game_status['last_played_cards'])]
+               
+            if last_played_cards == None:
+                #如果是第一个回合，那么可以出任意牌
+
+                return True
+            if self.can_beat(self.playing_cards,last_played_cards):
+                return True
+            else:
+                return False
+        def out_card(self,cards): #出牌
+            self.played_cards.append(cards)
+            for card in cards:
+                self.in_handNaNpxove(card)
+            self.turn=False #出牌回合结束，切换到下一个回合
+        def call_turn(self,follow_or_not:bool): #叫牌回合
+            #玩家选择要出的牌，或者不要。
+            if follow_or_not:
+                #玩家选择要出的牌
+                self
+                print('玩家',self.player_id,'要出的牌为：',self.played_cards)
+            else:
+                #玩家选择不要出的牌
+                print('玩家',self.player_id,'不要出的牌')
+
+
+
+# 游戏开始
+    import deck as d
+    deck=d.DeckwithJoker() #带小王和大王
+    # print(deck.cards)
+    deck.shuffle() #洗牌
+    # print(deck.cards)
+    #发牌，每人发17张牌，剩3张
+    player1_in_hand=deck.deal(17)
+    player2_in_hand=deck.deal(17)
+    player3_in_hand=deck.deal(17)
+    middle_cards=deck.deal(3) #中间3张牌
+    landlord=None #地主的编号，1、2、3分别对应玩家1、2、3成为地主
+    #叫地主
+    call_landlord(middle_cards) #该函数轮流选地主，产生地主
+
+    #出牌。地主先出
+
+    def call_landlord(middle_cards):
+        nonlocal player1_in_hand,player2_in_hand,player3_in_hand,landlord
+        player1_call=input('玩家1是否要叫地主？(y/n)')
+        if player1_call=='y':
+            player1_in_hand.extend(deck.deal(3))
+            print('地主牌为：',middle_cards)
+            landlord=1
+            return True
+        player2_call=input('玩家2是否要叫地主？(y/n)')    
+        if player2_call=='y':
+            player2_in_hand.extend(deck.deal(3))
+            print('地主牌为：',middle_cards)
+            landlord=2
+            return True
+        elif player3_call=='y':
+            player3_in_hand.extend(deck.deal(3))
+            print('地主牌为：',middle_cards)
+            landlord=3
+            return True
+        else:
+            print('玩家1、2、3都不叫地主，随机选择地主')
+        import random
+        landlord=random.randint(1,3)
+        if landlord==1:
+            player1_in_hand.extend(middle_cards)
+            print('玩家1成为地主')
+        elif landlord==2:
+            player2_in_hand.extend(middle_cards)
+            print('玩家2成为地主')
+        elif landlord==3:
+            player3_in_hand.extend(middle_cards)
+            print('玩家3成为地主')
+        return False
+        
+
+
 start_game()    
