@@ -7,6 +7,7 @@
 #7.AI出牌逻辑：自己出优先出单张。别人出，有大牌就压。
 #可视化：牌桌上显示当前在出的牌，玩家手中看到自己的牌，叠放。其他人的牌只显示背面。显示：开始按钮，下一局按钮。分数，出版记录。
 from termios import FF0
+from typing import Any
 import pygame
 import deck as d
 import pygame.freetype
@@ -27,10 +28,10 @@ BLACK = (0,0,0)       # 输入框文字色
 font_path='MSYH.TTC'
 font = pygame.freetype.Font(font_path, 28)
 large_font = pygame.freetype.Font(font_path, 48)
-#默认玩家姓名
-player1_name="玩家1"
-player2_name="玩家2"
-player3_name="玩家3"
+# #默认玩家姓名
+# player1_name="玩家1"
+# player2_name="玩家2"
+# player3_name="玩家3"
 #定义牌值，牌型
 def getjokervalue(card):
     if card[0]=="red":
@@ -56,6 +57,7 @@ game_status={
     'middle_cards':[],
     'landlord':None,
     'last_played_cards':None, #上一个回合出的牌
+    'turn':[player1.player_id,player2.player_id,player3.player_id], #当前回合的玩家,放在数组中，方便循环
 }
 
 #工具函数，判断牌型
@@ -199,7 +201,7 @@ def can_beat(current_cards:list,last_played_cards:list=None) -> bool:
             return False
         if cur==100 and last!=100: #如果是炸弹，绝对比他大
             return True
-        #同级比较
+        #同级比较，除去以上情况。
         if cur!=last: #牌型不同无法压
             return False
         if cur==last: #如果牌型相同，那么比较牌值
@@ -220,7 +222,7 @@ def can_beat(current_cards:list,last_played_cards:list=None) -> bool:
                 max1=count1.most_common(1)[0][0]
                 max2=count2.most_common(1)[0][0]
                 return rank_value[max1]>rank_value[max2]
-            if cur=='三带2' or cur=='四带2' or cur=='八带四' or cur=='飞机不带牌' or cur=='飞机各带1张' or cur=='飞机各带2张' or cur=='三架飞机不带牌' or cur=='三架飞机各带2':
+            if cur=='三带2' or cur=='四带2' or cur=='八带四' or cur=='飞机不带牌' or cur=='飞机各带1张' or cur=='飞机各带2张' or cur=='三架飞机不带牌' or cur=='三架飞机各带2' or cur==100:
                 count1=Counter([card[1] for card in current_cards]) #数每个值，返回字典
                 count2=Counter([v for k,v in last_played_cards ])
                 #解包字典，取出最大的牌值
@@ -234,28 +236,35 @@ def can_beat(current_cards:list,last_played_cards:list=None) -> bool:
                     max1=current_cards.sort(key=lambda x:rank_value[x[1]],reverse=True)[0][1]
                     max2=last_played_cards.sort(key=lambda x:rank_value[x[1]],reverse=True)[0][1]
                     return rank_value[max1]>rank_value[max2]
-def possible_cards() -> list: #不用传参，参数是固定的，自己的牌和牌桌上的牌,可以直接调用
+
+       
         #按照类型筛选出可以出的牌，要针对对方打出的牌的类型
         last=game_status['last_played_cards']
+        if last==None: #如果是第一个回合，那么可以出任意牌
+            return self.in_hand
         #如果对方是王炸,出不了牌
         if getcardtype(last)==200:
             return False
-        #如果对方是炸弹，那么只能出炸弹
+        #如果对方是炸弹，那么只能出炸弹，或者王炸
         if getcardtype(last)==100:
-
-            combo=combinations(current_cards,4) #从当前牌中选出4张牌
+            combo4=combinations(self.in_hand,4) #从当前牌中选出4张牌,四张牌会组成一个元组，每张又是元组
+            
+        length=len(last)
+        if length==4: #如果长度4张牌，已经考虑到炸弹的情况了，只需要加上王炸的情况
+            combo4=combinations(current_cards,length) #从当前牌中选出4张牌,四张牌会组成一个元组，每张又是元组
             #筛选出炸弹
-            combo=[list(card) for card in combo if getcardtype(list(card))=='炸弹'] #每个元素是元组，先转化成列表。
-            return combo
-        #如果对方是单张，那么只能出单张
-        if getcardtype(last)=='单张':
-            return [card for card in current_cards if getcardtype([card])=='单张']
-        #如果对方是对子，那么只能出对子
-        if getcardtype(last)=='对子':
-            return [card for card in current_cards if getcardtype([card])=='对子']
-        #按照类型筛选出可以出的牌，要针对对方打出的牌
+            combo=[list[tuple](el) for el in combo4 if can_beat(list(el),last)] #每个元素是元组，先转化成列表。这是含有比对方大的炸弹牌的列表。combinations是一个迭代器，是一次性的。combinations被迭代返回的每个元素是元组，所以要转化成列表。
+            jokercombo=[list[tuple](el) for el in combinations(current_cards,2) if can_beat(list(el),last)] #两张牌能比他大的就是王炸
+            return combo+jokercombo
+        else:    
+            combo=combinations(current_cards,length) #从当前牌中选出length张牌,length张牌会组成一个元组，每张又是元组
+            
+            combo=[list[tuple](el) for el in combo if can_beat(list(el),last)] #每个元素是元组，先转化成列表。
+            #加上炸弹和王炸
+            combobomb=[list[tuple](el) for el in combinations(current_cards,4) if can_beat(list(el),last)] #每个元素是元组，先转化成列表。这是含有比对方大的炸弹牌的列表。combinations是一个迭代器，是一次性的。combinations被迭代返回的每个元素是元组，所以要转化成列表。
+            jokercombo=[list[tuple](el) for el in combinations(current_cards,2) if can_beat(list(el),last)] #两张牌能比他大的就是王炸
 
-        return [card for card in current_cards if can_beat([card],last_played_cards)]
+            return combo+combobomb+jokercombo #返回可以出的牌,这是个列表，每个元素是列表，是可以出的牌。
         
 
 #游戏主体       
@@ -273,89 +282,125 @@ def start_game():
             self.out_card(self.played_cards)
         #回合开始，切换到出牌回合
         #判断自己选的牌是否比last_played_cards大
+        def possible_cards(self) -> list: #可以出的牌，不用传参，参数是固定的，自己的牌和牌桌上的牌,可以直接调用
+        #按照类型筛选出可以出的牌，要针对对方打出的牌的类型
+            last=game_status['last_played_cards']
+            if last==None: #如果是第一个回合，那么可以出任意牌
+                return self.in_hand
+            #如果对方是王炸,出不了牌
+            if getcardtype(last)==200:
+                return False
+      
+            length=len(last)
+            if length==4: #如果长度4张牌，已经考虑到炸弹的情况了，只需要加上王炸的情况
+                combo4=combinations(self.in_hand,length) #从当前牌中选出4张牌,四张牌会组成一个元组，每张又是元组
+                #筛选出炸弹
+                combo=[list[tuple](el) for el in combo4 if can_beat(list(el),last)] #每个元素是元组，先转化成列表。这是含有比对方大的炸弹牌的列表。combinations是一个迭代器，是一次性的。combinations被迭代返回的每个元素是元组，所以要转化成列表。
+                jokercombo=[list[tuple](el) for el in combinations(self.in_hand,2) if can_beat(list(el),last)] #两张牌能比他大的就是王炸
+                return combo+jokercombo
+            else:    
+                combo=combinations(self.in_hand,length) #从当前牌中选出length张牌,length张牌会组成一个元组，每张又是元组
+        
+                combo=[list[tuple](el) for el in combo if can_beat(list(el),last)] #每个元素是元组，先转化成列表。
+                #加上炸弹和王炸
+                combobomb=[list[tuple](el) for el in combinations(self.in_hand,4) if can_beat(list(el),last)] #每个元素是元组，先转化成列表。这是含有比对方大的炸弹牌的列表。combinations是一个迭代器，是一次性的。combinations被迭代返回的每个元素是元组，所以要转化成列表。
+                jokercombo=[list[tuple](el) for el in combinations(self.in_hand,2) if can_beat(list(el),last)] #两张牌能比他大的就是王炸
+
+                return combo+combobomb+jokercombo #返回可以出的牌,这是个列表，每个元素是列表，是可以出的牌。
 
         def start_turn(self): #开始自己的回合,并选择要出的牌
             self.turn=True #切换到出牌回合
-            while self.turn==True:
-               print(f'玩家{self.player_id}请选择要出的牌，')
-               #先模拟随便出牌，筛选出可以出的牌
-               possible_cards=[card for card in self.in_hand if can_beat([card],game_status['last_played_cards'])]
-               
-            if last_played_cards == None:
-                #如果是第一个回合，那么可以出任意牌
-
-                return True
-            if self.can_beat(self.playing_cards,last_played_cards):
-                return True
+            game_status['turn']=self.player_id #切换到当前回合的玩家
+           
+            print(f'玩家{self.player_id}请选择要出的牌，')
+            #先模拟随便出牌，筛选出可以出的牌
+            possible_cards=self.possible_cards()
+            if possible_cards:
+                self.playing_cards=possible_cards[:-1] #选择出最后一个牌型
+                self.out_card(self.playing_cards)
+                print('玩家',self.player_id,'要出的牌为：',self.playing_cards)
             else:
-                return False
+                   print('没有可以出的牌，回合结束')
+
         def out_card(self,cards): #出牌
             self.played_cards.append(cards)
             for card in cards:
-                self.in_handNaNpxove(card)
+                self.in_hand.remove(card)
             self.turn=False #出牌回合结束，切换到下一个回合
+            game_status['turn']=None #当前回合的玩家为空
         def call_turn(self,follow_or_not:bool): #叫牌回合
             #玩家选择要出的牌，或者不要。
-            if follow_or_not:
-                #玩家选择要出的牌
-                self
-                print('玩家',self.player_id,'要出的牌为：',self.played_cards)
-            else:
-                #玩家选择不要出的牌
-                print('玩家',self.player_id,'不要出的牌')
-
+            pass #先默认有大牌必出
 
 
 # 游戏开始
     import deck as d
     deck=d.DeckwithJoker() #带小王和大王
     # print(deck.cards)
+    player1=Player('玩家1')
+    player2=Player('玩家2')
+    player3=Player('玩家3')
     deck.shuffle() #洗牌
     # print(deck.cards)
     #发牌，每人发17张牌，剩3张
-    player1_in_hand=deck.deal(17)
-    player2_in_hand=deck.deal(17)
-    player3_in_hand=deck.deal(17)
-    middle_cards=deck.deal(3) #中间3张牌
-    landlord=None #地主的编号，1、2、3分别对应玩家1、2、3成为地主
+    player1.in_hand=deck.deal(17)
+    player2.in_hand=deck.deal(17)
+    player3.in_hand=deck.deal(17)
+    game_status['middle_cards']=deck.deal(3) #中间3张牌
+    game_status['landlord']=None #初始时，没有地主
+    game_status['last_played_cards']=None #上一个回合出牌的牌
     #叫地主
-    call_landlord(middle_cards) #该函数轮流选地主，产生地主
+    game_status['landlord']=call_landlord() #该函数轮流选地主，产生地主
+    game_status['landlord'].start_turn() #地主出牌回合
+    #出牌。地主先出,已经封装在叫地主的函数中，叫地主时，会切换到出牌回合
 
-    #出牌。地主先出
-
-    def call_landlord(middle_cards):
-        nonlocal player1_in_hand,player2_in_hand,player3_in_hand,landlord
+    def call_landlord(): #返回地主的名字
         player1_call=input('玩家1是否要叫地主？(y/n)')
         if player1_call=='y':
-            player1_in_hand.extend(deck.deal(3))
-            print('地主牌为：',middle_cards)
-            landlord=1
-            return True
+            player1.in_hand.extend(game_status['middle_cards'])
+            print('地主牌为：',game_status['middle_cards'])
+            player1.landlord=True
+            player1.start_turn() #玩家1出牌回合
+            game_status['landlord']=player1.player_id
+            
+            return player1.player_id
         player2_call=input('玩家2是否要叫地主？(y/n)')    
         if player2_call=='y':
-            player2_in_hand.extend(deck.deal(3))
-            print('地主牌为：',middle_cards)
-            landlord=2
-            return True
+            player2.in_hand.extend(game_status['middle_cards'])
+            print('地主牌为：',game_status['middle_cards'])         
+            player2.landlord=True
+            player2.start_turn() #玩家2出牌回合
+            return player2.player_id    
         elif player3_call=='y':
-            player3_in_hand.extend(deck.deal(3))
-            print('地主牌为：',middle_cards)
-            landlord=3
-            return True
+            player3.in_hand.extend(game_status['middle_cards'])
+            print('地主牌为：',game_status['middle_cards'])
+            player3.landlord=True
+            player3.start_turn() #玩家3出牌回合
+            return player3.player_id
         else:
             print('玩家1、2、3都不叫地主，随机选择地主')
         import random
         landlord=random.randint(1,3)
         if landlord==1:
-            player1_in_hand.extend(middle_cards)
+            player1.in_hand.extend(game_status['middle_cards'])
+            player1.landlord=True
+            player1.start_turn() #玩家1出牌回合
+            
+            
             print('玩家1成为地主')
         elif landlord==2:
-            player2_in_hand.extend(middle_cards)
+            player2.in_hand.extend(game_status['middle_cards'])
+            player2.landlord=True
+            player2.start_turn() #玩家2出牌回合
+            
             print('玩家2成为地主')
         elif landlord==3:
-            player3_in_hand.extend(middle_cards)
+            player3.in_hand.extend(game_status['middle_cards'])
+            player3.landlord=True
+            player3.start_turn() #玩家3出牌回合
+            
             print('玩家3成为地主')
-        return False
+        
         
 
 
