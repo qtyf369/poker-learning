@@ -203,6 +203,27 @@ def start_game():
         def possible_cards(self) -> list: #可以出的牌，不用传参，参数是固定的，自己的牌和牌桌上的牌,可以直接调用
         #按照类型筛选出可以出的牌，要针对对方打出的牌的类型
             last=game_status['last_played_cards']
+            #重构一下，暴力枚举太慢了。
+            #筛选自己的所有牌形，分类看。多张牌的用counter
+            #1.单张
+            single_cards=[[card] for card in self.in_hand if getcardtype([card])==1 and can_beat([card],last)]
+            #2.对子
+            countpair=Counter([card[1] for card in self.in_hand]) #数每个值，返回字典
+            pair_cards=[[card,card] for card in self.in_hand if getcardtype([card,card])==2 and can_beat([card,card],last)]
+            #3.三不带牌
+            triple_cards=[[card,card,card] for card in self.in_hand if getcardtype([card,card,card])==3 and can_beat([card,card,card],last)]
+            #4.炸弹
+            bomb_cards=[[card,card,card,card] for card in self.in_hand if getcardtype([card,card,card,card])==4 and can_beat([card,card,card,card],last)]
+            #5.三带1
+            triple_with_one=[[card,card,card,extra] for card in self.in_hand for extra in self.in_hand if getcardtype([card,card,card,extra])==4 and can_beat([card,card,card,extra],last)] 
+
+
+
+
+
+
+
+
             if last==None: #如果是第一个回合，那么可以出任意牌
                 #需要考虑不同牌型的情况
                 possible_cards=[]
@@ -251,7 +272,12 @@ def start_game():
             # print(f'玩家{self.id}请选择要出的牌，')
             #先模拟随便出牌，筛选出可以出的牌
             possible_cards=self.possible_cards()
-            print(f'玩家{self.id}可以出的牌为：',possible_cards)
+            print(f'{self.id}可以出的牌为：')
+            possible_cards.sort(key=lambda x:len(x)) #按牌型长度排序
+            for i in range(len(possible_cards)):
+                possible_cards[i].sort(key=lambda x:rank_value[x[1]]) #按牌值排序
+                print(f'{i+1}',possible_cards[i]) #按牌值排序
+
             if self.ai == False:
                 if possible_cards:
                     index=int(input('请选择要出的牌，输入牌型的序号'))
@@ -271,10 +297,15 @@ def start_game():
                     print(f'{self.id}打出的牌形为：',getcardtype(self.playing_cards))
 
                 else:
-                    print('没有可以出的牌，回合结束')
+                    print(f'{self.id}要不起，回合结束')
             if not self.in_hand: #如果自己手上没牌了，就结束回合
-                game_status['winner']=self #记录赢家
-                print(f'{self.id}手上没牌了，回合结束')
+                if self.landlord:
+                    game_status['winner']=[self] #记录赢家
+                    print('地主胜利')
+                else:
+                    game_status['winner']=[player for player in game_status['playerlist'] if player.landlord==False] #记录赢家
+                    print('农民胜利')
+                
         def out_card(self,cards): #出牌
             self.played_cards=cards #记录刚刚出的牌
             # print(f'玩家{self.id}出的牌群为：',cards)
@@ -313,14 +344,14 @@ def start_game():
                 return rank_value[current_cards[0][1]]>rank_value[last_played_cards[0][1]]
             if cur=='三带1':
                 count1=Counter([card[1] for card in current_cards]) #数每个值，返回字典
-                count2=Counter([v for k,v in last_played_cards ])
+                count2=Counter([card[1] for card in last_played_cards ])
                 #解包字典，取出最大的牌值
                 max1=count1.most_common(1)[0][0]
                 max2=count2.most_common(1)[0][0]
                 return rank_value[max1]>rank_value[max2]
             if cur=='三带2' or cur=='四带2' or cur=='八带四' or cur=='飞机不带牌' or cur=='飞机各带1张' or cur=='飞机各带2张' or cur=='三架飞机不带牌' or cur=='三架飞机各带2' or cur==100:
                 count1=Counter([card[1] for card in current_cards]) #数每个值，返回字典
-                count2=Counter([v for k,v in last_played_cards ])
+                count2=Counter([card[1] for card in last_played_cards ])
                 #解包字典，取出最大的牌值
                 max1=count1.most_common(1)[0][0]
                 max2=count2.most_common(1)[0][0]
@@ -377,8 +408,9 @@ def start_game():
             player2.landlord=True
             player2.start_turn() #玩家2出牌回合
             game_status['turn']=player2 #切换到当前回合的玩家
-            return player2   
-        elif player3_call=='y':
+            return player2  
+        player3_call=input('玩家3是否要叫地主？(y/n)')
+        if player3_call=='y':
             player3.in_hand.extend(game_status['middle_cards'])
             print('地主牌为：',game_status['middle_cards'])
             player3.landlord=True
@@ -425,8 +457,8 @@ def start_game():
     while not game_status['winner']: #如果赢家为空，就继续循环
         game_status['turn']=game_status['playerlist'][(game_status['playerlist'].index(game_status['turn'])+1)%3] #切换到下一个回合的玩家
         game_status['turn'].start_turn() #切换到下一个回合的玩家出牌回合
-
-    print(game_status['winner'].id,'是赢家')    
+    for winner in game_status['winner']:
+        print(winner.id,'是赢家')    
 
 
 start_game()    
