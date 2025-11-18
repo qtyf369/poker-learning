@@ -13,6 +13,7 @@ import deck as d
 import pygame.freetype
 from collections import Counter
 from itertools import combinations
+from collections.abc import Iterable 
 
 #定义常量
 #定义颜色
@@ -83,9 +84,9 @@ def getcardtype(cards:list): #定义牌形识别函数
         #判断是否有4个牌值出现次数等于4次
         list4=[k for k,v in count.items() if v==4]
         list4.sort(reverse=True) #将字典的值转换为列表，只保留出现次数等于4的牌值
-        if len(list4)==1:
+        if len(list4)==1 and len(cards)==6:
             return cardtype['四带二']
-        if len(list4)==2 and list4[0]==list4[1]+1:
+        if len(list4)==2 and list4[0]==list4[1]+1 and len(cards)==12:
             return cardtype['八带四']
        
          
@@ -165,7 +166,7 @@ def getcardtype(cards:list): #定义牌形识别函数
         if is_straight():
             return cardtype['顺子']
         elif cards[0][1]==cards[1][1] and cards[2][1]==cards[3][1]==cards[4][1] or cards[0][1]==cards[1][1] == cards[2][1] and cards[3][1]==cards[4][1]:
-            return cardtype['三带二']
+            return cardtype['三带2']
         else:
             return 0
     elif len(cards) >=6: #6张以上的牌，只能是顺子、连对、飞机或四带二
@@ -186,13 +187,14 @@ def getcardtype(cards:list): #定义牌形识别函数
 #游戏主体       
 def start_game():
     class Player: #把玩家的属性和方法封装在一个类中
-        def __init__(self,id):
+        def __init__(self,id,ai=True):
             self.id=id
             self.in_hand=[] #玩家手中的牌
             self.playing_cards=[] #正在选的牌，准备出
             self.played_cards=[] #刚刚出的牌,已经出过的牌，在牌桌上
             self.landlord=False #是否是地主,默认不是
             self.turn=False #是否是出牌回合,默认不是
+            self.ai=ai #是否是AI玩家,默认是
         #定义回合
         def play_turn(self): #出牌
             self.out_card(self.played_cards)
@@ -202,8 +204,22 @@ def start_game():
         #按照类型筛选出可以出的牌，要针对对方打出的牌的类型
             last=game_status['last_played_cards']
             if last==None: #如果是第一个回合，那么可以出任意牌
-                possible_cards=[[card] for card in self.in_hand]
-                return possible_cards #返回自己手中的牌，每个元素是一个列表，列表中只有一张牌
+                #需要考虑不同牌型的情况
+                possible_cards=[]
+                #先用字典整理出可以出的牌型的长度
+                valid={'单张':1,'对子':2,'三不带牌':3,'炸弹':4,'三带1':4,'三带二':5,'顺子':range(5,12,1),'连对':range(6,23,2),'飞机':[6,8,10,12,9,16]}
+                valid_lengths=set() #可以出的牌型的长度
+                for key in valid:
+                    if isinstance(valid[key],Iterable): #如果是可迭代对象，那么就是范围
+                        valid_lengths.update(valid[key]) #更新可以出的牌型的长度，用集合避免重复
+                    else:
+                        valid_lengths.add(valid[key]) #如果不是可迭代对象，那么就是单个数字
+                #筛选出可以出的牌型
+                for length in valid_lengths:
+                    combo=combinations(self.in_hand,length) #从当前牌中选出length张牌,length张牌会组成一个元组，每张又是元组
+                    possible_combo=[list(tuple(el)) for el in combo if getcardtype(list(el))] #筛选出可以出的牌型
+                    possible_cards.extend(possible_combo) #将可以出的牌型加入到列表中
+                return possible_cards #返回可以出的牌型的列表
             #如果对方是王炸,出不了牌
             if getcardtype(last)==200:
                 return []
@@ -236,16 +252,29 @@ def start_game():
             #先模拟随便出牌，筛选出可以出的牌
             possible_cards=self.possible_cards()
             print(f'玩家{self.id}可以出的牌为：',possible_cards)
-            if possible_cards:
-                self.playing_cards=possible_cards[-1] #选择出最后一个牌型
-                self.out_card(self.playing_cards)
-                game_status['last_played_cards']=self.playing_cards #记录刚刚出的牌
-                print(f'玩家{self.id}出的牌为：',self.playing_cards)
+            if self.ai == False:
+                if possible_cards:
+                    index=int(input('请选择要出的牌，输入牌型的序号'))
+                    self.playing_cards=possible_cards[index-1] #选择出最后一个牌型
+                    self.out_card(self.playing_cards)
+                    game_status['last_played_cards']=self.playing_cards #记录刚刚出的牌
+                else:
+                    print('没有可以出的牌，回合结束')
+                print(f'{self.id}出的牌为：',self.playing_cards)
+                
             else:
-                   print('没有可以出的牌，回合结束')
+                if possible_cards:
+                    self.playing_cards=possible_cards[-1] #选择出第一个牌型
+                    self.out_card(self.playing_cards)
+                    game_status['last_played_cards']=self.playing_cards #记录刚刚出的牌
+                    print(f'{self.id}出的牌为：',self.playing_cards)
+                    print(f'{self.id}打出的牌形为：',getcardtype(self.playing_cards))
+
+                else:
+                    print('没有可以出的牌，回合结束')
             if not self.in_hand: #如果自己手上没牌了，就结束回合
                 game_status['winner']=self #记录赢家
-                print(f'玩家{self.id}手上没牌了，回合结束')
+                print(f'{self.id}手上没牌了，回合结束')
         def out_card(self,cards): #出牌
             self.played_cards=cards #记录刚刚出的牌
             # print(f'玩家{self.id}出的牌群为：',cards)
@@ -300,8 +329,10 @@ def start_game():
                if len(current_cards)!=len(last_played_cards):
                     return False
                else:
-                    max1=current_cards.sort(key=lambda x:rank_value[x[1]],reverse=True)[0][1]
-                    max2=last_played_cards.sort(key=lambda x:rank_value[x[1]],reverse=True)[0][1]
+                    current_cards.sort(key=lambda x:rank_value[x[1]],reverse=True)
+                    max1=current_cards[0][1] 
+                    last_played_cards.sort(key=lambda x:rank_value[x[1]],reverse=True)
+                    max2=last_played_cards[0][1]
                     return rank_value[max1]>rank_value[max2]
 
        
