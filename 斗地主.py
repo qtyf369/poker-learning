@@ -202,7 +202,8 @@ def start_game():
         #按照类型筛选出可以出的牌，要针对对方打出的牌的类型
             last=game_status['last_played_cards']
             if last==None: #如果是第一个回合，那么可以出任意牌
-                return self.in_hand #返回自己手中的牌，这是列表
+                possible_cards=[[card] for card in self.in_hand]
+                return possible_cards #返回自己手中的牌，每个元素是一个列表，列表中只有一张牌
             #如果对方是王炸,出不了牌
             if getcardtype(last)==200:
                 return []
@@ -231,23 +232,25 @@ def start_game():
             if self.played_cards==game_status['last_played_cards']: #如果自己出的牌和上一个回合出的牌相同，说明是自己打的牌。
                 game_status['last_played_cards']=None   # 自己重新出任意牌       
             
-            print(f'玩家{self.id}请选择要出的牌，')
+            # print(f'玩家{self.id}请选择要出的牌，')
             #先模拟随便出牌，筛选出可以出的牌
             possible_cards=self.possible_cards()
+            print(f'玩家{self.id}可以出的牌为：',possible_cards)
             if possible_cards:
-                self.playing_cards=possible_cards[:-1] #选择出最后一个牌型
+                self.playing_cards=possible_cards[-1] #选择出最后一个牌型
                 self.out_card(self.playing_cards)
-                self.played_cards.append(self.playing_cards)
                 game_status['last_played_cards']=self.playing_cards #记录刚刚出的牌
                 print(f'玩家{self.id}出的牌为：',self.playing_cards)
             else:
                    print('没有可以出的牌，回合结束')
             if not self.in_hand: #如果自己手上没牌了，就结束回合
-                game_status['winner']=self.id #记录赢家
+                game_status['winner']=self #记录赢家
                 print(f'玩家{self.id}手上没牌了，回合结束')
         def out_card(self,cards): #出牌
-            self.played_cards.append(cards)
+            self.played_cards=cards #记录刚刚出的牌
+            # print(f'玩家{self.id}出的牌群为：',cards)
             for card in cards:
+                # print(f'玩家{self.id}出的牌为：',card)
                 self.in_hand.remove(card)
             self.turn=False #出牌回合结束，切换到下一个回合
             
@@ -391,7 +394,8 @@ def start_game():
     while not game_status['winner']: #如果赢家为空，就继续循环
         game_status['turn']=game_status['playerlist'][(game_status['playerlist'].index(game_status['turn'])+1)%3] #切换到下一个回合的玩家
         game_status['turn'].start_turn() #切换到下一个回合的玩家出牌回合
-        print('我到这里了')
+
+    print(game_status['winner'].id,'是赢家')    
 
 
 start_game()    
