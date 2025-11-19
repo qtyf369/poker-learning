@@ -42,7 +42,7 @@ def getjokervalue(card):
 joker_value=getjokervalue("red_joker")        
 rank_value={
     "3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,"10":10,
-    "J":11,"Q":12,"K":13,"A":14,"2":15,"王":20
+    "J":11,"Q":12,"K":13,"A":14,"2":16,"王":20
 }
 suit_value={
     "梅花":1,"方块":2,"红心":3,"黑桃":4,'小':5,'大':6, #大小王的比较
@@ -206,14 +206,63 @@ def start_game():
             #重构一下，暴力枚举太慢了。
             #筛选自己的所有牌形，分类看。多张牌的用counter
             #1.单张
-            single_cards=[[card] for card in self.in_hand if getcardtype([card])==1 and can_beat([card],last)]
+            possible_single=[[card] for card in self.in_hand if getcardtype([card])=='单张' and can_beat([card],last)]
             #2.对子
-            countpair=Counter([card[1] for card in self.in_hand]) #数每个值，返回字典
-            pair_cards=[[card,card] for card in self.in_hand if getcardtype([card,card])==2 and can_beat([card,card],last)]
-            #3.三不带牌
-            triple_cards=[[card,card,card] for card in self.in_hand if getcardtype([card,card,card])==3 and can_beat([card,card,card],last)]
+            count=Counter([card[1] for card in self.in_hand]) #数每个值，返回字典，键是值，值是出现次数，这个后面还可以用
+            pairlistrank=[k for k,v in count.items() if v>=2 and v!='王'] #筛选出出现次数大于等于2的牌值，排除王
+            #根据牌值从手牌中筛选出对子
+            possible_pairs=[]
+            for rank in pairlistrank:
+                cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
+                #从牌值为rank的牌中筛选出对子
+                for pair in combinations(cards_of_rank, 2):
+                        possible_pairs.append(list(pair)) #t每个Pair是单独牌型，需转化为列表
+
+            #3.三张牌，要考虑，带1或带2。
+            
+            triplelistrank=[k for k,v in count.items() if v>=3] #筛选出出现次数大于等于3的牌值
+            possible_triple=[]
+            possible_triple_with_one=[]
+            possible_triple_with_pair=[]
+
+            for rank in triplelistrank: #根据牌值遍历
+                cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
+                other_cards=[card for card in self.in_hand if card[1]!=rank] #从手牌中筛选出其他牌值的牌,只要不一样都能带
+                count_other=Counter([card[1] for card in other_cards]) #数其他牌值，返回字典，键是值，值是出现次数
+                pair_other_rank=[k for k,v in count_other.items() if v>=2] #筛选出其他牌值中出现次数大于等于2的牌值
+
+                # other_pair=[card for card in other_cards if card[1] in pair_other_rank] #从其他牌中筛选出对子
+                
+                for triple in combinations(cards_of_rank, 3): #从牌值为rank的牌中筛选出三不带牌
+                        possible_triple.append(list(triple)) #每个Triple是单独牌型，需转化为列表
+                        for one in other_cards:
+                            possible_triple_with_one.append(list(triple)+[one]) #三带1
+                        for pair_rank in pair_other_rank:
+                            cards_of_rank_pair=[card for card in other_cards if card[1]==pair_rank] #从其他牌中筛选出牌值为pair_rank的牌，比如pair_rank为2，那么就筛选出所有不同花色的2
+                            for pair in combinations(cards_of_rank_pair, 2):
+                                possible_triple_with_pair.append(list(triple)+list(pair)) #三带2
+            
             #4.炸弹
-            bomb_cards=[[card,card,card,card] for card in self.in_hand if getcardtype([card,card,card,card])==4 and can_beat([card,card,card,card],last)]
+            possible_bomb=[]
+            bomb_rank=[k for k,v in count.items() if v==4] #筛选出出现次数等于4的牌值
+            for rank in bomb_rank:
+                cards_of_rank_bomb=[card for card in self.in_hand if card[1] == rank] #从手牌中筛选出牌值为炸弹的牌
+                possible_bomb.append(cards_of_rank_bomb) #每个炸弹是单独牌型，需转化为列表
+            
+            #5.顺子
+            possible_straight=[]
+            #挑选出所有的牌值，然后排序，去重
+            ranklist=sorted(set([card[1] for card in self.in_hand if rank_value[card[1]]<=14]),key=lambda x:rank_value[x]) #从手牌中筛选出所有的牌值，然后排序，去重
+            #顺子的张数为5-12张，3-A，顺子的特点是最后一张减第一张等于len-1
+            if len(ranklist)>=5:
+                for i in range(len(ranklist)):
+                    
+                for i in range(len(ranklist)-4): #从牌值列表中筛选出顺子
+                    if rank_value[ranklist[i+4]]-rank_value[ranklist[i]]==4: #如果最后一张减第一张等于4，那么就是顺子
+                    possible_straight.append(ranklist[i:i+5]) #加入到顺子列表中，注意是切片，包括i，不包括i+5
+
+
+
             #5.三带1
             triple_with_one=[[card,card,card,extra] for card in self.in_hand for extra in self.in_hand if getcardtype([card,card,card,extra])==4 and can_beat([card,card,card,extra],last)] 
 
