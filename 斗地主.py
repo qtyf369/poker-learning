@@ -109,11 +109,11 @@ def getcardtype(cards:list): #定义牌形识别函数
             if len(cards)==6:
                 return cardtype['飞机不带牌']
             elif len(cards)==8:
-                print('飞机各带1张')
+                # print('飞机各带1张')
                 return cardtype['飞机各带1张']
             elif len(cards)==10:
                if len(airplane_2times_list)==2:
-                print('飞机各带2张')
+                # print('飞机各带2张')
                 return cardtype['飞机各带2张']
           else:
               return False
@@ -122,10 +122,10 @@ def getcardtype(cards:list): #定义牌形识别函数
             if len(cards)==9:
                 return cardtype['三架飞机不带牌']
             elif len(cards)==12:
-                print('三架飞机各带1张')
+                # print('三架飞机各带1张')
                 return cardtype['三架飞机各带1']
             elif len(cards)==14:
-                print('三架飞机各带2张')
+                # print('三架飞机各带2张')
                 if len(airplane_2times_list)==3:
                     return cardtype['三架飞机各带2']
                 else:
@@ -211,7 +211,7 @@ def start_game():
                 possible_single=[[card] for card in self.in_hand]
                 #2.对子
                 count=Counter([card[1] for card in self.in_hand]) #数每个值，返回字典，键是值，值是出现次数，这个后面还可以用
-                pairlistrank=[k for k,v in count.items() if v>=2 and v!='王'] #筛选出出现次数大于等于2的牌值，排除王
+                pairlistrank=[k for k,v in count.items() if v>=2 and k!='王'] #筛选出出现次数大于等于2的牌值,排除王
                 #根据牌值从手牌中筛选出对子
                 possible_pairs=[]
                 for rank in pairlistrank:
@@ -361,7 +361,7 @@ def start_game():
                 #8.王炸
                 possible_joker_bomb=[card for card in self.in_hand if card[1]=='王']
                 if len(possible_joker_bomb)==2: #如果王炸牌数等于2，那么就是王炸
-                    pass
+                    possible_joker_bomb=[possible_joker_bomb] #将王炸牌加入到列表中
                 else: #如果王炸牌数不等于2，那么不是王炸
                     possible_joker_bomb=[]
                 return possible_single+possible_pairs+possible_triple+possible_triple_with_one+possible_triple_with_pair+possible_airplane+possible_bomb+possible_straight+possible_chain_pair+possible_joker_bomb
@@ -540,7 +540,8 @@ def start_game():
     'winner':None, #赢家
 }
     def call_landlord(): #返回地主的名字
-        player1_call=input('玩家1是否要叫地主？(y/n)')
+        player1_call='y'#测试
+        # player1_call=input('玩家1是否要叫地主？(y/n)')
         if player1_call=='y':
             player1.in_hand.extend(game_status['middle_cards'])
             print('地主牌为：',game_status['middle_cards'])
