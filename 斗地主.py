@@ -205,179 +205,189 @@ def start_game():
             last=game_status['last_played_cards']
             #重构一下，暴力枚举太慢了。
             #筛选自己的所有牌形，分类看。多张牌的用counter
+            if last==None:
+
             #1.单张
-            possible_single=[[card] for card in self.in_hand if getcardtype([card])=='单张' and can_beat([card],last)]
-            #2.对子
-            count=Counter([card[1] for card in self.in_hand]) #数每个值，返回字典，键是值，值是出现次数，这个后面还可以用
-            pairlistrank=[k for k,v in count.items() if v>=2 and v!='王'] #筛选出出现次数大于等于2的牌值，排除王
-            #根据牌值从手牌中筛选出对子
-            possible_pairs=[]
-            for rank in pairlistrank:
-                cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
-                #从牌值为rank的牌中筛选出对子
-                for pair in combinations(cards_of_rank, 2):
-                        possible_pairs.append(list(pair)) #t每个Pair是单独牌型，需转化为列表
+                possible_single=[[card] for card in self.in_hand]
+                #2.对子
+                count=Counter([card[1] for card in self.in_hand]) #数每个值，返回字典，键是值，值是出现次数，这个后面还可以用
+                pairlistrank=[k for k,v in count.items() if v>=2 and v!='王'] #筛选出出现次数大于等于2的牌值，排除王
+                #根据牌值从手牌中筛选出对子
+                possible_pairs=[]
+                for rank in pairlistrank:
+                    cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
+                    #从牌值为rank的牌中筛选出对子
+                    for pair in combinations(cards_of_rank, 2):
+                            possible_pairs.append(list(pair)) #t每个Pair是单独牌型，需转化为列表
 
-            #3.三张牌，要考虑，带1或带2。
-            
-            triplelistrank=[k for k,v in count.items() if v>=3] #筛选出出现次数大于等于3的牌值
-            possible_triple=[]
-            possible_triple_with_one=[]
-            possible_triple_with_pair=[]
+                #3.三张牌，要考虑，带1或带2。
 
-            for rank in triplelistrank: #根据牌值遍历
-                cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
-                other_cards=[card for card in self.in_hand if card[1]!=rank] #从手牌中筛选出其他牌值的牌,只要不一样都能带
-                count_other=Counter([card[1] for card in other_cards]) #数其他牌值，返回字典，键是值，值是出现次数
-                pair_other_rank=[k for k,v in count_other.items() if v>=2] #筛选出其他牌值中出现次数大于等于2的牌值
+                triplelistrank=[k for k,v in count.items() if v>=3] #筛选出出现次数大于等于3的牌值
+                possible_triple=[]
+                possible_triple_with_one=[]
+                possible_triple_with_pair=[]
 
-                # other_pair=[card for card in other_cards if card[1] in pair_other_rank] #从其他牌中筛选出对子
-                
-                for triple in combinations(cards_of_rank, 3): #从牌值为rank的牌中筛选出三不带牌
-                        possible_triple.append(list(triple)) #每个Triple是单独牌型，需转化为列表
-                        for one in other_cards:
-                            possible_triple_with_one.append(list(triple)+[one]) #三带1
-                        for pair_rank in pair_other_rank:
-                            cards_of_rank_pair=[card for card in other_cards if card[1]==pair_rank] #从其他牌中筛选出牌值为pair_rank的牌，比如pair_rank为2，那么就筛选出所有不同花色的2
-                            for pair in combinations(cards_of_rank_pair, 2):
-                                possible_triple_with_pair.append(list(triple)+list(pair)) #三带2
-            
-            #4.炸弹
-            possible_bomb=[]
-            bomb_rank=[k for k,v in count.items() if v==4] #筛选出出现次数等于4的牌值
-            for rank in bomb_rank:
-                cards_of_rank_bomb=[card for card in self.in_hand if card[1] == rank] #从手牌中筛选出牌值为炸弹的牌
-                possible_bomb.append(cards_of_rank_bomb) #每个炸弹是单独牌型，需转化为列表
-            
-            #5.顺子
-            possible_straight=[]
-            #挑选出所有的牌值，然后排序，去重
-            ranklist=sorted(set([card[1] for card in self.in_hand if rank_value[card[1]]<=14]),key=lambda x:rank_value[x]) #从手牌中筛选出所有的牌值，然后排序，去重
-            #顺子的张数为5-12张，3-A，顺子的特点是最后一张减第一张等于len-1
-            if len(ranklist)>=5:
-                for length in range(5,13):
-                       
-                    for i in range(len(ranklist)-length+1): #从牌值列表中筛选出顺子
-                        if rank_value[ranklist[i+length-1]]-rank_value[ranklist[i]]==length-1: #如果最后一张减第一张等于length-1，那么就是顺子
-                            straight_cards=[] #这是个中转列表，用来存储当前顺子的具体花色牌
-                            for rank in ranklist[i:i+length]: #这个切片就是当前顺子的牌值列表，比如[3,4,5,6,7]
-                                cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
-                                straight_cards.append(cards_of_rank) #每个元素为一个列表，列表中为当前牌值的所有不同花色牌
-                            
-                            cards=[list(card) for card in product(*straight_cards)]
-                            #* straight_cards是一个列表，列表中每个元素为一个列表，列表中为当前牌值的所有不同花色牌
-                            #比如straight_cards为[[3,3,3,3],[4,4,4,4],[5,5,5,5],[6,6,6,6],[7,7,7,7]]，那么product(*straight_cards)就是所有不同花色的顺子，比如(3,4,5,6,7)
-                            #每个元素为一个元组，元组中为当前顺子的具体牌，比如(3,4,5,6,7)，需要将每个元组转化为列表，才能加入到possible_straight中
-                            possible_straight.append(cards) 
+                for rank in triplelistrank: #根据牌值遍历
+                    cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
+                    other_cards=[card for card in self.in_hand if card[1]!=rank] #从手牌中筛选出其他牌值的牌,只要不一样都能带
+                    count_other=Counter([card[1] for card in other_cards]) #数其他牌值，返回字典，键是值，值是出现次数
+                    pair_other_rank=[k for k,v in count_other.items() if v>=2] #筛选出其他牌值中出现次数大于等于2的牌值
 
-            #6.连对
-            possible_chain_pair=[]
-            # 前面已经有pairlistrank=[k for k,v in count.items() if v>=2 and v!='王'] #筛选出出现次数大于等于2的牌值，排除王
-            #挑选出所有对子的牌值，然后排序
-            pairlistrank_inorder=sorted([rank for rank in pairlistrank if rank_value[rank]<=14],key=lambda x:rank_value[x]) #从手牌中筛选出所有的对子牌值，然后排序
-            #连对的单张数为3-12张（实际张数*2），3-A，连对的特点是最后一张减第一张等于len-1，由于最多20张，也就是最多10对连对，最少3对
+                    # other_pair=[card for card in other_cards if card[1] in pair_other_rank] #从其他牌中筛选出对子
 
-            if len(pairlistrank_inorder)>=3:  #如果对子数大于等于3，那么就可能有连对
-                for length in range(3,11): #连对最多10对，最少3对
-                       
-                    for i in range(len(pairlistrank_inorder)-length+1): #从牌值列表中筛选出连对
-                        if rank_value[pairlistrank_inorder[i+length-1]]-rank_value[pairlistrank_inorder[i]]==length-1: #如果最后一张减第一张等于length-1，那么就是连对
-                            chain_pair_cards=[] #这是个中转列表，用来存储当前连对的具体花色牌
-                            for rank in pairlistrank_inorder[i:i+length]: #这个切片就是当前连对的牌值列表，比如[3,4,5,6,7]
-                               cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
-                               paircards=combinations(cards_of_rank,2) #从当前牌值的所有不同花色牌中筛选出对子
-                               chain_pair_cards.append(list(paircards)) #每个元素为一个列表，列表中为当前牌值的所有不同花色对子牌
-                            cards=[sum(card,[]) for card in product(*chain_pair_cards)] #sum可以去掉一层嵌套
-                            #* chain_pair_cards是一个列表，列表中每个元素为一个列表，列表中为当前牌值的所有不同花色对子牌
-                            #比如chain_pair_cards为[[[3,3],[3,4],[3,5],[3,6],[3,7]],[[4,4],[4,5],[4,6],[4,7]],[[5,5],[5,6],[5,7]],[[6,6],[6,7]],[[7,7]]]，那么product(*chain_pair_cards)就是所有不同花色的连对，比如(3,3,4,4,5,5)
-                            #每个元素为一个元组，元组中为当前连对的具体牌，比如(3,3,4,4,5,5)，需要将每个元组转化为列表，才能加入到possible_chain_pair中
-                            possible_chain_pair.extend(cards) 
-            #7.飞机
-            #triplelistrank=[k for k,v in count.items() if v>=3] #筛选出出现次数大于等于3的牌值 前面已经定义了
-            #挑选出所有三张的牌值，然后排序
-            triplelistrank_inorder=sorted([rank for rank in triplelistrank if rank_value[rank]<=14],key=lambda x:rank_value[x]) #从手牌中筛选出所有的三张牌值，然后排序，从小到大
-            possible_airplane=[]
-            #飞机需要两组以上的三张牌值。最多6组
+                    for triple in combinations(cards_of_rank, 3): #从牌值为rank的牌中筛选出三不带牌
+                            possible_triple.append(list(triple)) #每个Triple是单独牌型，需转化为列表
+                            for one in other_cards:
+                                possible_triple_with_one.append(list(triple)+[one]) #三带1
+                            for pair_rank in pair_other_rank:
+                                cards_of_rank_pair=[card for card in other_cards if card[1]==pair_rank] #从其他牌中筛选出牌值为pair_rank的牌，比如pair_rank为2，那么就筛选出所有不同花色的2
+                                for pair in combinations(cards_of_rank_pair, 2):
+                                    possible_triple_with_pair.append(list(triple)+list(pair)) #三带2
 
-            if len(triplelistrank_inorder)>=2: #如果三张一样的牌个数大于等于2，那么就可能有飞机
-                for length in range(2,7): #飞机最多6组，最少2组,length为飞机的架数
-                       
-                    for i in range(len(triplelistrank_inorder)-length+1): #从牌值列表中筛选出飞机
-                        if rank_value[triplelistrank_inorder[i+length-1]]-rank_value[triplelistrank_inorder[i]]==length-1: #如果最后一张减第一张等于length-1，那么就是飞机
-                            airplane_cards=[] #这是个中转列表，用来存储当前飞机的具体花色牌
-                            for rank in triplelistrank_inorder[i:i+length]: #这个切片就是当前飞机的牌值列表，比如[3,4,5,6,7]
-                                cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
-                                triplecards=combinations(cards_of_rank,3) #从当前牌值的所有不同花色牌中筛选出三张牌
-                                airplane_cards.append(list(triplecards)) #每个元素为一个列表，列表中为当前牌值的所有不同花色的三连牌
-                            airplane_with_nocard=[sum(card,[]) for card in product(*airplane_cards)] #这是飞机不带牌的牌组，用product可以得到所有不同花色的飞机，sum可以去掉一层嵌套
-                            #* airplane_cards是一个列表，列表中每个元素为一个列表，列表中为当前牌值的所有不同花色的三连牌
-                            #比如airplane_cards为[[[3,3,3],[3,3,4],[3,3,5],[3,3,6],[3,3,7]],[[4,4,4],[4,4,5],[4,4,6],[4,4,7]],[[5,5,5],[5,5,6],[5,5,7]],[[6,6,6],[6,6,7]],[[7,7,7]]]，那么product(*airplane_cards)就是所有不同花色的飞机，比如(3,3,3,4,4,4,5,5,5,6,6,6,7,7,7)
-                            
-                            possible_airplane.extend(airplane_with_nocard) #将飞机不带牌的牌加入到列表中
-                            
-                            #飞机带1张牌
-                            airplane_with_one=[]
-                            #筛选带牌池，需要和飞机牌不一样。
-                            main_rank=triplelistrank_inorder[i:i+length]
-                            band_pool=[card for card in self.in_hand if card[1] not in main_rank] #带牌池就是手牌中减去飞机主牌的所有不同花色的牌
-                            if len(band_pool)>=length: #如果带牌池中的牌数大于等于飞机架数，那么就可能有飞机带1张牌，如果小于就不够了
-                                band_combo=list(combinations(band_pool,length)) #从带牌池中选出length张牌，每个元素为一个列表，列表中为当前带牌池中的牌
-                                for triple in airplane_with_nocard: #每个大飞机带length张牌
-                                    for extra_cards in band_combo: #对带牌池中的每一张牌，都和当前飞机不带牌的牌组合起来
-                                        airplane_with_one.append(triple+list(extra_cards)) #将当前飞机不带牌的牌和当前带牌池中的牌组合起来，加入到飞机带1张牌的列表中
+                #4.炸弹
+                possible_bomb=[]
+                bomb_rank=[k for k,v in count.items() if v==4] #筛选出出现次数等于4的牌值
+                for rank in bomb_rank:
+                    cards_of_rank_bomb=[card for card in self.in_hand if card[1] == rank] #从手牌中筛选出牌值为炸弹的牌
+                    possible_bomb.append(cards_of_rank_bomb) #每个炸弹是单独牌型，需转化为列表
 
-                                possible_airplane.extend(airplane_with_one) #将飞机带1张牌的牌加入到列表中
-                            #飞机带2张牌
-                            airplane_with_two=[]
-                            #筛选带牌池，需要和飞机牌不一样。
-                            main_rank=triplelistrank_inorder[i:i+length]
-                            band_pool=[card for card in self.in_hand if card[1] not in main_rank] #带牌池就是手牌中减去飞机主牌的所有不同花色的牌
-                            #再数里面的对子
-                            countbandpair=Counter([card[1] for card in band_pool]) #统计带牌池中的对子牌值的出现次数
+                #5.顺子
+                possible_straight=[]
+                #挑选出所有的牌值，然后排序，去重
+                ranklist=sorted(set([card[1] for card in self.in_hand if rank_value[card[1]]<=14]),key=lambda x:rank_value[x]) #从手牌中筛选出所有的牌值，然后排序，去重
+                #顺子的张数为5-12张，3-A，顺子的特点是最后一张减第一张等于len-1
+                if len(ranklist)>=5:
+                    for length in range(5,13):
 
-                            band_pair_pool=[card[1] for card in band_pool if countbandpair[card[1]]>=2] #筛选出带牌池中的对子牌值，每个元素为一个列表，列表中为当前对子牌值的所有不同花色的对子牌   
-                            if len(band_pair_pool)>=length*2: #如果带牌池中的牌数大于等于飞机架数*2，那么就飞机带一对，如果小于就不够了
-                                band_combo=list(combinations(band_pool,length*2)) #从带牌池中选出length*2张牌，每个元素为一个列表，列表中为当前带牌池中的牌
-                                for triple in airplane_with_nocard: #每个大飞机带length张牌
-                                    for extra_cards in band_combo: #对带牌池中的每一张牌，都和当前飞机不带牌的牌组合起来
-                                        airplane_with_two.append(triple+list(extra_cards)) #将当前飞机不带牌的牌和当前带牌池中的牌组合起来，加入到飞机带2张牌的列表中
-                                possible_airplane.extend(airplane_with_two) #将飞机带2张牌的牌加入到列表中
-                            #    
+                        for i in range(len(ranklist)-length+1): #从牌值列表中筛选出顺子
+                            if rank_value[ranklist[i+length-1]]-rank_value[ranklist[i]]==length-1: #如果最后一张减第一张等于length-1，那么就是顺子
+                                straight_cards=[] #这是个中转列表，用来存储当前顺子的具体花色牌
+                                for rank in ranklist[i:i+length]: #这个切片就是当前顺子的牌值列表，比如[3,4,5,6,7]
+                                    cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
+                                    straight_cards.append(cards_of_rank) #每个元素为一个列表，列表中为当前牌值的所有不同花色牌
 
+                                cards=[list(card) for card in product(*straight_cards)]
+                                #* straight_cards是一个列表，列表中每个元素为一个列表，列表中为当前牌值的所有不同花色牌
+                                #比如straight_cards为[[3,3,3,3],[4,4,4,4],[5,5,5,5],[6,6,6,6],[7,7,7,7]]，那么product(*straight_cards)就是所有不同花色的顺子，比如(3,4,5,6,7)
+                                #每个元素为一个元组，元组中为当前顺子的具体牌，比如(3,4,5,6,7)，需要将每个元组转化为列表，才能加入到possible_straight中
+                                possible_straight.extend(cards) #这里上面已经是列表了，不能重复嵌套了。
 
+                #6.连对
+                possible_chain_pair=[]
+                # 前面已经有pairlistrank=[k for k,v in count.items() if v>=2 and v!='王'] #筛选出出现次数大于等于2的牌值，排除王
+                #挑选出所有对子的牌值，然后排序
+                pairlistrank_inorder=sorted([rank for rank in pairlistrank if rank_value[rank]<=14],key=lambda x:rank_value[x]) #从手牌中筛选出所有的对子牌值，然后排序
+                #连对的单张数为3-12张（实际张数*2），3-A，连对的特点是最后一张减第一张等于len-1，由于最多20张，也就是最多10对连对，最少3对
 
+                if len(pairlistrank_inorder)>=3:  #如果对子数大于等于3，那么就可能有连对
+                    for length in range(3,11): #连对最多10对，最少3对
 
+                        for i in range(len(pairlistrank_inorder)-length+1): #从牌值列表中筛选出连对
+                            if rank_value[pairlistrank_inorder[i+length-1]]-rank_value[pairlistrank_inorder[i]]==length-1: #如果最后一张减第一张等于length-1，那么就是连对
+                                chain_pair_cards=[] #这是个中转列表，用来存储当前连对的具体花色牌
+                                for rank in pairlistrank_inorder[i:i+length]: #这个切片就是当前连对的牌值列表，比如[3,4,5,6,7]
+                                   cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
+                                   paircards=combinations(cards_of_rank,2) #从当前牌值的所有不同花色牌中筛选出对子
+                                   chain_pair_cards.append(list(paircards)) #每个元素为一个列表，列表中为当前牌值的所有不同花色对子牌
+                                cards=[list(sum(card,())) for card in product(*chain_pair_cards)] #sum可以去掉一层嵌套，但必须是同类型的嵌套，这里是元组
+                                #* chain_pair_cards是一个列表，列表中每个元素为一个列表，列表中为当前牌值的所有不同花色对子牌
+                                #比如chain_pair_cards为[[[3,3],[3,4],[3,5],[3,6],[3,7]],[[4,4],[4,5],[4,6],[4,7]],[[5,5],[5,6],[5,7]],[[6,6],[6,7]],[[7,7]]]，那么product(*chain_pair_cards)就是所有不同花色的连对，比如(3,3,4,4,5,5)
+                                #每个元素为一个元组，元组中为当前连对的具体牌，比如(3,3,4,4,5,5)，需要将每个元组转化为列表，才能加入到possible_chain_pair中
+                                possible_chain_pair.extend(cards) 
+                #7.飞机
+                #triplelistrank=[k for k,v in count.items() if v>=3] #筛选出出现次数大于等于3的牌值 前面已经定义了
+                #挑选出所有三张的牌值，然后排序
+                triplelistrank_inorder=sorted([rank for rank in triplelistrank if rank_value[rank]<=14],key=lambda x:rank_value[x]) #从手牌中筛选出所有的三张牌值，然后排序，从小到大
+                possible_airplane=[]
+                #飞机需要两组以上的三张牌值。最多6组
 
+                if len(triplelistrank_inorder)>=2: #如果三张一样的牌个数大于等于2，那么就可能有飞机
+                    for length in range(2,7): #飞机最多6组，最少2组,length为飞机的架数
 
+                        for i in range(len(triplelistrank_inorder)-length+1): #从牌值列表中筛选出飞机
+                            if rank_value[triplelistrank_inorder[i+length-1]]-rank_value[triplelistrank_inorder[i]]==length-1: #如果最后一张减第一张等于length-1，那么就是飞机
+                                airplane_cards=[] #这是个中转列表，用来存储当前飞机的具体花色牌
+                                for rank in triplelistrank_inorder[i:i+length]: #这个切片就是当前飞机的牌值列表，比如[3,4,5,6,7]
+                                    cards_of_rank=[card for card in self.in_hand if card[1]==rank] #从手牌中筛选出牌值为rank的牌，比如rank为2，那么就筛选出所有不同花色的2
+                                    triplecards=combinations(cards_of_rank,3) #从当前牌值的所有不同花色牌中筛选出三张牌
+                                    airplane_cards.append(list(triplecards)) #每个元素为一个列表，列表中为当前牌值的所有不同花色的三连牌
+                                airplane_with_nocard=[list(sum(card,())) for card in product(*airplane_cards)] #这是飞机不带牌的牌组，用product可以得到所有不同花色的飞机，sum可以去掉一层嵌套
+                                #* airplane_cards是一个列表，列表中每个元素为一个列表，列表中为当前牌值的所有不同花色的三连牌
+                                #比如airplane_cards为[[[3,3,3],[3,3,4],[3,3,5],[3,3,6],[3,3,7]],[[4,4,4],[4,4,5],[4,4,6],[4,4,7]],[[5,5,5],[5,5,6],[5,5,7]],[[6,6,6],[6,6,7]],[[7,7,7]]]，那么product(*airplane_cards)就是所有不同花色的飞机，比如(3,3,3,4,4,4,5,5,5,6,6,6,7,7,7)
 
-            #5.三带1
-            triple_with_one=[[card,card,card,extra] for card in self.in_hand for extra in self.in_hand if getcardtype([card,card,card,extra])==4 and can_beat([card,card,card,extra],last)] 
+                                possible_airplane.extend(airplane_with_nocard) #将飞机不带牌的牌加入到列表中
+
+                                #飞机带1张牌
+                                airplane_with_one=[]
+                                #筛选带牌池，需要和飞机牌不一样。
+                                main_rank=triplelistrank_inorder[i:i+length]
+                                band_pool=[card for card in self.in_hand if card[1] not in main_rank] #带牌池就是手牌中减去飞机主牌的所有不同花色的牌
+                                if len(band_pool)>=length: #如果带牌池中的牌数大于等于飞机架数，那么就可能有飞机带1张牌，如果小于就不够了
+                                    band_combo=list(combinations(band_pool,length)) #从带牌池中选出length张牌，每个元素为一个列表，列表中为当前带牌池中的牌
+                                    for triple in airplane_with_nocard: #每个大飞机带length张牌
+                                        for extra_cards in band_combo: #对带牌池中的每一张牌，都和当前飞机不带牌的牌组合起来
+                                            airplane_with_one.append(triple+list(extra_cards)) #将当前飞机不带牌的牌和当前带牌池中的牌组合起来，加入到飞机带1张牌的列表中
+
+                                    possible_airplane.extend(airplane_with_one) #将飞机带1张牌的牌加入到列表中
+                                #飞机带2张牌
+                                airplane_with_two=[]
+                                #筛选带牌池，需要和飞机牌不一样。
+                                #main_rank=triplelistrank_inorder[i:i+length]，这个已经定义了，所以这里不需要再定义一次 
+                                band_pool=[card for card in self.in_hand if card[1] not in main_rank] #带牌池就是手牌中减去飞机主牌的所有不同花色的牌
+                                #再数里面的对子
+                                countbandpair=Counter([card[1] for card in band_pool]) #统计带牌池中的所有牌值的出现次数
+
+                                band_pair_pool=[k for k,v in countbandpair.items() if v>=2] #筛选出带牌池中的对子牌值，这是一个列表  
+                                if len(band_pair_pool)>=length: #如果带牌池中的对子牌数大于等于飞机架数，那么就可能有飞机带一对，如果小于就不够了
+                                    pair_card_candicate=[] #这个列表用来存候选的对子牌
+                                    for pair in band_pair_pool: #对带牌池中的每一张对子牌，都至少有2张或以上，需要列出所有不同花色的对子牌
+                                        cards_of_rank=[card for card in band_pool if card[1]==pair] #从带牌池中筛选出牌值为pair的牌，比如pair为2，那么就筛选出所有不同花色的2
+                                        combo=list(combinations(cards_of_rank,2)) #从当前对子牌值的所有不同花色的对子牌中筛选出2张牌.输出例子，假设2有3张：[（红桃2，黑桃2），(红桃2，梅花2),(黑桃2，梅花2)]
+                                        #combo是一个列表，列表中每个元素为一个元组，元组中为当前对子牌值的所有不同花色的对子牌
+                                        pair_card_candicate.append(combo) #将当前对子牌值的所有不同花色的对子牌加入到候选的对子牌列表中
+                                    #从候选的对子牌列表中筛选出length组对子牌，每个元素为一个列表，列表中为当前带牌池中的对子牌，用combinations
+                                    band_pair_cards=[]
+                                    for band_pair_card in combinations(pair_card_candicate,length): #所有对子之间的组合，还需要遍历每个组合
+                                        band_pair_combo=list(product(*band_pair_card)) #这个是length对对子牌的所有不同花色的组合
+                                        band_pair_cards+=[list(sum(pair,())) for pair in band_pair_combo] #sum把（红桃2，黑桃2），(红桃3，梅花3)这种元组展开成列表：[红桃2，黑桃2，红桃3，梅花3]
 
 
+                                    for triple in airplane_with_nocard: #每个大飞机带length个对子
+                                        for band_pair in band_pair_cards: #对带牌池中的每一组对子牌，都和当前飞机不带牌的牌组合起来
+                                            airplane_with_two.append(triple+band_pair) #将当前飞机不带牌的牌和当前带牌池中的对子牌组合起来，加入到飞机带2张牌的列表中
+                                    possible_airplane.extend(airplane_with_two) #将飞机带2张牌的牌加入到列表中
+                                #    
 
-
-
-
-
-
-            if last==None: #如果是第一个回合，那么可以出任意牌
-                #需要考虑不同牌型的情况
-                possible_cards=[]
-                #先用字典整理出可以出的牌型的长度
-                valid={'单张':1,'对子':2,'三不带牌':3,'炸弹':4,'三带1':4,'三带二':5,'顺子':range(5,12,1),'连对':range(6,23,2),'飞机':[6,8,10,12,9,16]}
-                valid_lengths=set() #可以出的牌型的长度
-                for key in valid:
-                    if isinstance(valid[key],Iterable): #如果是可迭代对象，那么就是范围
-                        valid_lengths.update(valid[key]) #更新可以出的牌型的长度，用集合避免重复
-                    else:
-                        valid_lengths.add(valid[key]) #如果不是可迭代对象，那么就是单个数字
+                #8.王炸
+                possible_joker_bomb=[card for card in self.in_hand if card[1]=='王']
+                if len(possible_joker_bomb)==2: #如果王炸牌数等于2，那么就是王炸
+                    pass
+                else: #如果王炸牌数不等于2，那么不是王炸
+                    possible_joker_bomb=[]
+                return possible_single+possible_pairs+possible_triple+possible_triple_with_one+possible_triple_with_pair+possible_airplane+possible_bomb+possible_straight+possible_chain_pair+possible_joker_bomb
+            # if last==None: #如果是第一个回合，那么可以出任意牌
+            #     #需要考虑不同牌型的情况
+            #     possible_cards=[]
+            #     #先用字典整理出可以出的牌型的长度
+            #     valid={'单张':1,'对子':2,'三不带牌':3,'炸弹':4,'三带1':4,'三带二':5,'顺子':range(5,12,1),'连对':range(6,23,2),'飞机':[6,8,10,12,9,16]}
+            #     valid_lengths=set() #可以出的牌型的长度
+            #     for key in valid:
+            #         if isinstance(valid[key],Iterable): #如果是可迭代对象，那么就是范围
+            #             valid_lengths.update(valid[key]) #更新可以出的牌型的长度，用集合避免重复
+            #         else:
+            #             valid_lengths.add(valid[key]) #如果不是可迭代对象，那么就是单个数字
                 #筛选出可以出的牌型
-                for length in valid_lengths:
-                    combo=combinations(self.in_hand,length) #从当前牌中选出length张牌,length张牌会组成一个元组，每张又是元组
-                    possible_combo=[list(tuple(el)) for el in combo if getcardtype(list(el))] #筛选出可以出的牌型
-                    possible_cards.extend(possible_combo) #将可以出的牌型加入到列表中
-                return possible_cards #返回可以出的牌型的列表
+                # for length in valid_lengths:
+                #     combo=combinations(self.in_hand,length) #从当前牌中选出length张牌,length张牌会组成一个元组，每张又是元组
+                #     possible_combo=[list(tuple(el)) for el in combo if getcardtype(list(el))] #筛选出可以出的牌型
+                #     possible_cards.extend(possible_combo) #将可以出的牌型加入到列表中
+                # return possible_cards #返回可以出的牌型的列表
+           
+           
+           
+           
             #如果对方是王炸,出不了牌
+           
             if getcardtype(last)==200:
                 return []
       
