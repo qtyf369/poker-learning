@@ -18,6 +18,10 @@ from itertools import product #从itertools导入product函数，用来生成笛
 import random
 import deck as d
 import sys
+import os
+
+
+
 #定义常量
 #定义颜色
 green=(0,128,0)
@@ -238,7 +242,7 @@ def can_beat(current_cards:list,last_played_cards:list=None) -> bool:
 
        
 
-def reset_game(game_status:dict):
+def next_game(game_status:dict):
     deck=d.DeckwithJoker() #带小王和大王新建一幅牌
     deck.shuffle() #洗牌
     player1,player2,player3=game_status['playerlist']
@@ -304,7 +308,7 @@ def reset_game(game_status:dict):
             
             print('玩家3成为地主')
         
-    player1.ai=False
+    # player1.ai=False
     game_status['middle_cards']=deck.deal(3) #中间3张牌
     game_status['landlord']=None #初始时，没有地主
     game_status['last_played_cards']=None #上一个回合出牌的牌
@@ -662,17 +666,17 @@ def start_game():
     BLACK = (0,0,0)       # 输入框文字色
 
     pygame.init()
-    screen_width=1200
-    screen_height=800
+    screen_width=1600
+    screen_height=1000
 
     screen=pygame.display.set_mode((screen_width,screen_height))
     pygame.display.set_caption('斗地主')
     pygame.freetype.init()
     font_path = 'MSYH.TTC'
-    font = pygame.freetype.Font(font_path, 28)
+    font = pygame.freetype.Font(font_path, 24)
     large_font = pygame.freetype.Font(font_path, 48)
 
-
+    #玩家输入相关部分
     input1_rect = pygame.Rect(350, 50, 300, 40)  # 玩家1输入框（中间偏上）
     input2_rect = pygame.Rect(350, 110, 300, 40) # 玩家2输入框（在玩家1下面）
     input3_rect = pygame.Rect(350, 170, 300, 40) # 玩家3输入框（在玩家2下面）
@@ -706,58 +710,176 @@ def start_game():
                 return False
 
     #开始按钮和重置按钮
-    start_button=Button('开始游戏',(screen_width//2+350,screen_height//2-100 ),large_font)
+    start_button=Button('开始游戏',(screen_width//2,screen_height//2 ),large_font)
     start_status=False #未开始
-    next_button=Button('下一局游戏',(screen_width//2+350,screen_height//2-100),large_font)
-    reset_button=Button('重置游戏',(screen_width//2+350,screen_height//2+50),large_font)
+    next_button=Button('下一局游戏',(screen_width-300,screen_height//2-400),large_font)
+    reset_button=Button('重置游戏',(screen_width-300,screen_height//2-300),large_font)
 
+    #出牌按钮和Pass按钮
+    out_button=Button('出牌',(screen_width//2,screen_height//2-100),large_font)
+    pass_button=Button('Pass',(screen_width//2,screen_height//2-200),large_font)
+
+    #分数框，这个是要多次渲染的。得放主循环里面，渲染就是把东西先画好放到内存里。
+    score_font = pygame.freetype.Font(font_path, 26)
+    
+    score_text1_pos=(screen_width//3*2,100)
+    score_text2_pos=(screen_width//3*2,150)
+    score_text3_pos=(screen_width//3*2,200)
 
     #游戏主循环
     clock = pygame.time.Clock()
+    # 输入框是否激活
+    input_active=0
+    # 0表示没有输入框被激活
+    # 1表示玩家1的输入框被激活
+    # 2表示玩家2的输入框被激活
+    # 3表示玩家3的输入框被激活
+    
+    # 输入框中的文本
+    input_text1=''
+    input_text2=''
+    input_text3=''
+    # 定义所有可能的回车按键（包含小回车和换行）
+    PYGAME_ALL_ENTER = (
+    pygame.K_RETURN,       # 主回车（通用）
+    pygame.K_KP_ENTER,     # 官方小回车（台式机）
+    1073741912,            # 笔记本小回车（你的场景）
+    271,                   # 台式机小回车数值（兜底）
+    10                     # Linux 换行/回车（兜底）
+)
     while True:
         for event in pygame.event.get():
             if event.type==pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-        screen.fill(GREEN)
-        # 渲染并绘制输入框中的文本
-        # font.render_to(screen, (input1_rect.x+5, input1_rect.y+5), input_text1, BLACK)
-        # font.render_to(screen, (input2_rect.x+5, input2_rect.y+5), input_text2, BLACK)
-        # font.render_to(screen, (input3_rect.x+5, input3_rect.y+5), input_text3, BLACK)
+            if event.type==pygame.MOUSEBUTTONDOWN:
+                if start_button.click(event.pos): #点击开始按钮
+                        start_status=True
+                        next_game(game_status) #开始游戏
+                if next_button.click(event.pos):
+                        # 下一局游戏，把除分数外的其他项都归零
+                        next_game(game_status)
+                if reset_button.click(event.pos):
+                        # 重置游戏，把所有项都归零
+                        player1.score=100
+                        player2.score=100
+                        player3.score=100
+                        player1.id='玩家1'
+                        player2.id='玩家2'
+                        player3.id='玩家3'
+                        start_status=False
+                if not start_status: #这部分菜单逻辑是在游戏未开始时生效
+                   
+                    # 点击输入框时激活相应的输入框
+                    if input1_rect.collidepoint(event.pos):
+                        input_active=1
+                
+                    elif input2_rect.collidepoint(event.pos):
+                        input_active=2
+                    
+                    elif input3_rect.collidepoint(event.pos):
+                        input_active=3  
+                    else:
+                        input_active=0
 
-        # 绘制输入框边上的标签
-        screen.blit(input1_label, input1_label_pos)
-        screen.blit(input2_label, input2_label_pos)
-        screen.blit(input3_label, input3_label_pos)
+            if event.type==pygame.KEYDOWN:
+               
+        
+                if input_active==0: #如果没有输入框被激活，就忽略按键事件
+                    
+                    if event.key in PYGAME_ALL_ENTER: #没有输入框被激活时，除了回车，其他按键都被忽略
+                        input_active=1
+                else: #如果有输入框被激活，就处理按键事件
+                    if event.unicode.isprintable(): #只处理可打印字符
+                        if input_active==1:
+                            input_text1+=event.unicode
+                        elif input_active==2:
+                            input_text2+=event.unicode
+                        elif input_active==3:
+                            input_text3+=event.unicode
+                    if event.key in PYGAME_ALL_ENTER:
+                        if input_active==1:
+                            player1.id=input_text1 or '玩家1'
+                            input_text1=''
+                            input_active=2
+                        elif input_active==2:
+                            player2.id=input_text2 or '玩家2'
+                            input_text2=''
+                            input_active=3
+                        elif input_active==3:
+                            player3.id=input_text3 or '玩家3'
+                            input_text3=''
+                            input_active=0
+                    if event.key==pygame.K_BACKSPACE:
+                        if input_active==1:
+                            input_text1=input_text1[:-1]
+                        elif input_active==2:
+                            input_text2=input_text2[:-1]
+                        elif input_active==3:
+                            input_text3=input_text3[:-1]
+
+                
+                    
+
+        screen.fill(GREEN)
+        if start_status:
+            next_button.draw(screen)
+            reset_button.draw(screen)
+        else:
+            start_button.draw(screen)
+        score_text1,score_text1_rect = score_font.render(f'{player1.id}：{player1.score}', WHITE)
+        score_text2,score_text2_rect = score_font.render(f'{player2.id}：{player2.score}', WHITE)
+        score_text3,score_text3_rect = score_font.render(f'{player3.id}：{player3.score}', WHITE)
+        
+
+        #绘制分数
+        screen.blit(score_text1,score_text1_pos)
+        screen.blit(score_text2,score_text2_pos)
+        screen.blit(score_text3,score_text3_pos)
+        
+        #渲染并绘制输入框中的文本
+        font.render_to(screen, (input1_rect.x+5, input1_rect.y+5), input_text1, BLACK)
+        font.render_to(screen, (input2_rect.x+5, input2_rect.y+5), input_text2, BLACK)
+        font.render_to(screen, (input3_rect.x+5, input3_rect.y+5), input_text3, BLACK)
+
+        # 绘制输入框边上的标签，游戏开始后不显示
+        if not start_status:
+            screen.blit(input1_label, input1_label_pos)
+            screen.blit(input2_label, input2_label_pos)
+            screen.blit(input3_label, input3_label_pos)
+            #绘制输入框
+            pygame.draw.rect(screen, GRAY if input_active==1 else WHITE, input1_rect, 2)
+            pygame.draw.rect(screen, GRAY if input_active==2 else WHITE, input2_rect, 2)
+            pygame.draw.rect(screen, GRAY if input_active==3 else WHITE, input3_rect, 2)
         # 渲染玩家姓名
         player1_name=player1.id
-        player2_name=None
-        player3_name=None
+        player2_name=player2.id
+        player3_name=player3.id
         player1_name=player1_name if player1_name else "玩家1"
         player2_name=player2_name if player2_name else "玩家2"
         player3_name=player3_name if player3_name else "玩家3"
-        player1_name_text,player1_name_rect = large_font.render(player1_name,  WHITE)
-        player2_name_text,player2_name_rect = large_font.render(player2_name,  WHITE)
-        player3_name_text,player3_name_rect = large_font.render(player3_name,  WHITE)
-        # player1_name_pos=(player1_card1_pos[0]+450, player1_card1_pos[1]-200)
-        # player2_name_pos=(player2_card1_pos[0]-200, player2_card1_pos[1]+100)    
-        # player3_name_pos=(player3_card1_pos[0]+450, player3_card1_pos[1]-200)
-        #分数框
+        player1_name_text,player1_name_rect = font.render(player1_name,  WHITE)
+        player2_name_text,player2_name_rect = font.render(player2_name,  WHITE)
+        player3_name_text,player3_name_rect = font.render(player3_name,  WHITE)
+        player1_name_pos=(800, 900)
+        player2_name_pos=(1500, 500)    
+        player3_name_pos=(50, 500)
+        # 分数框
         # score_rect=pygame.Rect(500,50,200,100)
         # pygame.draw.rect(screen,WHITE,score_rect)
         # font.render_to(screen,(550,70),f'玩家1:{player1.score}',BLACK)
         # font.render_to(screen,(550,130),f'玩家2:{player2.score}',BLACK)
         # font.render_to(screen,(550,190),f'玩家3:{player3.score}',BLACK)
         # # 绘制玩家姓名
-        # screen.blit(player1_name_text, player1_name_pos)
-        # screen.blit(player2_name_text, player2_name_pos)    
-        # screen.blit(player3_name_text, player3_name_pos)
+        screen.blit(player1_name_text, player1_name_pos)
+        screen.blit(player2_name_text, player2_name_pos)    
+        screen.blit(player3_name_text, player3_name_pos)
         
         pygame.display.flip()
 
         clock.tick(60)
 
-    # reset_game(game_status)
+    # next_game(game_status)
 
 start_game()
 
