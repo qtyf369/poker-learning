@@ -97,11 +97,12 @@ class Card_inhand: #手牌排序和位置，每张手牌绑定个精灵
         
         #牌的旋转角度
         self.angle=angle
+        self._rotate() #初始化时，旋转牌
 
 
 
     #旋转
-    def rotate(self): #相当于确定位置的函数
+    def _rotate(self): #相当于确定位置的函数
         if self.angle==0:
             return
         if self.angle!=0:
@@ -109,11 +110,11 @@ class Card_inhand: #手牌排序和位置，每张手牌绑定个精灵
                 sprite.image=pygame.transform.rotozoom(sprite.image,self.angle,1)
                 sprite.rect=sprite.image.get_rect()
                 if self.angle==90:
-                    self.rect.x=self.pos[0]
-                    self.rect.y=self.pos[1]+self.gap*idx
+                    sprite.rect.x=self.pos[0]
+                    sprite.rect.y=self.pos[1]+self.gap*idx
                 if self.angle==-90:
-                    self.rect.x=self.pos[0]
-                    self.rect.y=self.pos[1]-self.gap*idx
+                    sprite.rect.x=self.pos[0]
+                    sprite.rect.y=self.pos[1]-self.gap*idx
     def _inorder(self): #排序，按牌值从大到小排序
         self.cards.sort(key=lambda x:rank_value[x[1]],reverse=True)
 
@@ -122,7 +123,7 @@ class Card_inhand: #手牌排序和位置，每张手牌绑定个精灵
         self.sprites=[CardImage(card) for card in self.cards] #每个牌绑定个精灵,精灵列表
         self.group.empty()
         self.group.add(self.sprites)
-        self.rotate()
+        self._rotate()
         
     def change(self,cards:list): #改变手牌，一般是出牌后调用
         self.cards=cards
@@ -334,10 +335,10 @@ def next_game(game_status:dict): #初始化阶段+发牌
     # 剩余3张牌，作为中间牌
     game_status['middle_cards']=deck.deal(3)
     #建立玩家手牌类实例
-    player1.hand=Card_inhand(player1.in_hand,(500,600))
-    player2.hand=Card_inhand(player2.in_hand,(200,300),angle=90)
-    player3.hand=Card_inhand(player3.in_hand,(800,600),angle=-90)
-
+    player1.hand=Card_inhand(player1.in_hand,(600,800))
+    player3.hand=Card_inhand(player2.in_hand,(200,300),angle=90)
+    player2.hand=Card_inhand(player3.in_hand,(1300,600),angle=-90)
+    game_status['middle_cards_sprite']=Card_inhand(game_status['middle_cards'],(800,100),order=False,gap=100)
     # cardGroup=Group()
     # #元组和精灵映射
     # cardSpriteMap={}
@@ -354,19 +355,17 @@ def next_game(game_status:dict): #初始化阶段+发牌
     game_status['landlord']=None #初始时，没有地主
     game_status['last_played_cards']=None #上一个回合出牌的牌
     #叫地主
-    
-    game_status['landlord'].start_turn() #地主出牌回合
-    # print(game_status['turn'],'这是有效的')
-    #地主出完了，下一个回合
+    game_status['status']='call_landlord'
+   
     #有玩家手上没牌了，就结束
-    while not game_status['winner']: #如果赢家为空，就继续循环
-        game_status['turn']=game_status['playerlist'][(game_status['playerlist'].index(game_status['turn'])+1)%3] #切换到下一个回合的玩家
-        game_status['turn'].start_turn() #切换到下一个回合的玩家出牌回合
-    for winner in game_status['winner']:
+    # while not game_status['winner']: #如果赢家为空，就继续循环
+    #     game_status['turn']=game_status['playerlist'][(game_status['playerlist'].index(game_status['turn'])+1)%3] #切换到下一个回合的玩家
+    #     game_status['turn'].start_turn() #切换到下一个回合的玩家出牌回合
+    # for winner in game_status['winner']:
 
-        print(winner.id,'是赢家')    
-    for player in game_status['playerlist']:
-        print(f'{player.id}当前分数为：{player.score}')
+    #     print(winner.id,'是赢家')    
+    # for player in game_status['playerlist']:
+    #     print(f'{player.id}当前分数为：{player.score}')
 
 
 
@@ -607,7 +606,7 @@ def start_game():
                     for player in game_status['players']:
                         if player!=game_status['landlord']:
                             player.score-=5 #其他玩家输5分
-                    return [self] #返回当前玩家的id
+                    return [self] 
                 else:
                     winner=[]
                     game_status['landlord'].score+=10 
@@ -619,10 +618,10 @@ def start_game():
             else:
                 return None #这回合没人赢       
         def start_turn(self): #开始自己的回合,并选择要出的牌
-            if self.ai==False:
-                pass   #如果不是AI玩家，那么需要可视化界面选择要出的牌，进入选牌阶段
+            if self.ai==False: 
+                game_status['status']='out_card' 
           
-            else:
+            else:#ai不用进入出牌阶段，直接出
                 if self.played_cards==game_status['last_played_cards']: #如果自己出的牌和上一个回合出的牌相同，说明是自己打的牌。
                     game_status['last_played_cards']=None   # 自己重新出任意牌       
                 
@@ -690,7 +689,7 @@ def start_game():
             game_status['landlord']=self
             game_status['landlord'].in_hand.extend(game_status['middle_cards']) #地主手上的牌加上中间的牌
             print(f'{game_status['landlord'].id}是地主')
-            game_status['status']='out_card' #叫地主后，进入出牌状态
+            
 
 # 游戏开始
    
@@ -710,6 +709,7 @@ def start_game():
     'playerlist':[player1,player2,player3], #玩家列表，方便循环
     'winner':None, #赢家
     'status':'wait', #游戏状态，开始、叫地主、出牌、结束,wait,start,call_landlord,out_card,end
+    'middle_cards_sprite':None,
 }
     #可视化pygame
     GREEN=(0,128,0)
@@ -765,8 +765,8 @@ def start_game():
             #创建一个临时的Rect对象，用于绘制按钮，只用于偏移后绘制，不改变按钮的位置
             orgin_rect=self.rect.copy()
             draw_rect=self.rect.copy()
-            draw_rect.x+=4  # 增加水平偏移量
-            draw_rect.y+=4  # 保持垂直偏移量
+            draw_rect.x+=3  # 增加水平偏移量
+            draw_rect.y+=3  # 保持垂直偏移量
             if self.is_clicked:
                 draw_color = self.bg_color  # 点击时使用原始颜色
                 current_rect=draw_rect
@@ -817,7 +817,7 @@ def start_game():
 
 
     #叫地主按钮
-    call_landlord_button=Button('叫地主',(screen_width//2,screen_height//2-300),large_font)
+    call_landlord_button=Button('叫地主',(screen_width//2,screen_height//2+200),font)
 
     #分数框，这个是要多次渲染的。得放主循环里面，渲染就是把东西先画好放到内存里。
     score_font = pygame.freetype.Font(font_path, 26)
@@ -826,12 +826,7 @@ def start_game():
     score_text2_pos=(screen_width//3*2,150)
     score_text3_pos=(screen_width//3*2,200)
 
-        #建立精灵组
-    
-
- 
       
-
   
 
             
@@ -839,8 +834,7 @@ def start_game():
     clock = pygame.time.Clock()
     # 输入框是否激活
     input_active=0
-    # 游戏状态标志
-    start_new_game = False
+    
     # 0表示没有输入框被激活
     # 1表示玩家1的输入框被激活
     # 2表示玩家2的输入框被激活
@@ -945,6 +939,7 @@ def start_game():
         if game_status['status']=='wait':
             start_button.draw(screen)
 
+        
 
 
 
@@ -955,13 +950,16 @@ def start_game():
         if game_status['status']=='start': 
             next_game(game_status)
             reset_button.draw(screen)
+
+        if  not game_status['status']=='wait':   
             player1.hand.group.draw(screen)
             player2.hand.group.draw(screen)
             player3.hand.group.draw(screen)
-            player1.hand.group.update(mouse_pos,mouse_down)
-            player2.hand.group.update(mouse_pos,mouse_down)
-            player3.hand.group.update(mouse_pos,mouse_down)
-            game_status['status']='call_landlord'
+            game_status['middle_cards_sprite'].group.draw(screen)
+            # player1.hand.group.update(mouse_pos,mouse_down)
+            # player2.hand.group.update(mouse_pos,mouse_down)
+            # player3.hand.group.update(mouse_pos,mouse_down)
+            
         
         if game_status['status']=='call_landlord':
             call_landlord_button.draw(screen)
@@ -973,7 +971,7 @@ def start_game():
         start_button.update(mouse_pos,mouse_down)
         next_button.update(mouse_pos,mouse_down)
         reset_button.update(mouse_pos,mouse_down)
-        
+        call_landlord_button.update(mouse_pos,mouse_down)
       
 
         
