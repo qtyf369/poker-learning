@@ -19,7 +19,7 @@ import random
 import deck as d
 import sys
 import os
-
+from pygame.sprite import Sprite,Group
 
 
 #定义常量
@@ -57,6 +57,80 @@ suit_value={
 cardtype={
     '单张':'单张','对子':'对子','三不带牌':'三不带牌','三带1':'三带1','三带2':'三带2','顺子':'顺子','连对':'连对','四带二':'四带二','八带四':'八带四','飞机不带牌':'飞机不带牌','飞机各带1张':'飞机各带1张','飞机各带2张':'飞机各带2张','三架飞机不带牌':'三架飞机不带牌','三架飞机各带1':'三架飞机各带1','三架飞机各带2':'三架飞机各带2','炸弹':100,'王炸':200
 }
+
+   #精灵类。图像牌和所有牌的映射
+class CardImage(Sprite):
+    def __init__(self,card:tuple,face_up=True):
+        super().__init__()
+        self.card=card
+        self.suit=card[0]
+        self.rank=card[1]
+        self.image=d.card_load(card,(80,120))
+        self.rect=self.image.get_rect()
+        self.face_up=face_up #牌是否面向玩家
+        self.selected=False #牌是否被选中
+        if not face_up:
+            self.image=d.card_load(("back",""),(80,120)) #牌正面朝上时，显示牌面，否则显示牌背
+
+    def update(self): #更新牌的显示
+        if self.face_up:
+            self.image=d.card_load(self.card,(80,120))
+        else:
+            self.image=d.card_load(("back",""),(80,120))
+        if self.selected:
+            
+            self.rect=self.image.get_rect()
+            self.rect.topleft=(self.rect.topleft[0],self.rect.topleft[1]-10)
+class Card_inhand: #手牌排序和位置，每张手牌绑定个精灵
+    def __init__(self,cards:list,pos:(int,int),angle=0,order=True,gap=20): #从起始位置向后牌,order等于True时，按牌值从大到小排序
+        self.cards=cards
+        self.pos=pos
+        if order:
+            self._inorder()
+        self.sprites=[CardImage(card) for card in cards] #每个牌绑定个精灵,精灵列表
+        self.group=Group(self.sprites) #将所有牌绑定个精灵组
+        self.gap=gap
+        #设置牌的位置,默认牌之间间距为20
+        for i,sprite in enumerate(self.sprites):
+            sprite.rect.topleft=(self.pos[0]+i*self.gap,self.pos[1])
+        
+        
+        #牌的旋转角度
+        self.angle=angle
+
+
+
+    #旋转
+    def rotate(self): #相当于确定位置的函数
+        if self.angle==0:
+            return
+        if self.angle!=0:
+            for idx,sprite in enumerate(self.sprites):       
+                sprite.image=pygame.transform.rotozoom(sprite.image,self.angle,1)
+                sprite.rect=sprite.image.get_rect()
+                if self.angle==90:
+                    self.rect.x=self.pos[0]
+                    self.rect.y=self.pos[1]+self.gap*idx
+                if self.angle==-90:
+                    self.rect.x=self.pos[0]
+                    self.rect.y=self.pos[1]-self.gap*idx
+    def _inorder(self): #排序，按牌值从大到小排序
+        self.cards.sort(key=lambda x:rank_value[x[1]],reverse=True)
+
+    def _refresh(self): #出牌后刷新牌的位置
+        self._inorder()
+        self.sprites=[CardImage(card) for card in self.cards] #每个牌绑定个精灵,精灵列表
+        self.group.empty()
+        self.group.add(self.sprites)
+        self.rotate()
+        
+    def change(self,cards:list): #改变手牌，一般是出牌后调用
+        self.cards=cards
+        self._refresh()
+    
+
+
+
 
 
 
@@ -242,7 +316,7 @@ def can_beat(current_cards:list,last_played_cards:list=None) -> bool:
 
        
 
-def next_game(game_status:dict):
+def next_game(game_status:dict): #初始化阶段+发牌
     deck=d.DeckwithJoker() #带小王和大王新建一幅牌
     deck.shuffle() #洗牌
     player1,player2,player3=game_status['playerlist']
@@ -252,69 +326,35 @@ def next_game(game_status:dict):
     game_status['last_played_cards']=None #上一个回合出的牌
     game_status['turn']=None #当前回合的玩家
     game_status['winner']=None #赢家
-      #发牌，每人发17张牌，剩3张
+      #发牌，每人发17张牌，剩3张,抽象牌
     player1.in_hand=deck.deal(17)
     player2.in_hand=deck.deal(17)
     player3.in_hand=deck.deal(17)
    
-    def call_landlord(): #返回地主的名字
-        player1_call='y'#测试
-        # player1_call=input('玩家1是否要叫地主？(y/n)')
-        if player1_call=='y':
-            player1.in_hand.extend(game_status['middle_cards'])
-            print('地主牌为：',game_status['middle_cards'])
-            player1.landlord=True         
-            game_status['turn']=player1 #切换到当前回合的玩家。用这个来确定谁出牌
-            return player1
-        player2_call=input('玩家2是否要叫地主？(y/n)')    
-        if player2_call=='y':
-            player2.in_hand.extend(game_status['middle_cards'])
-            print('地主牌为：',game_status['middle_cards'])         
-            player2.landlord=True
-            player2.start_turn() #玩家2出牌回合
-            game_status['turn']=player2 #切换到当前回合的玩家
-            return player2  
-        player3_call=input('玩家3是否要叫地主？(y/n)')
-        if player3_call=='y':
-            player3.in_hand.extend(game_status['middle_cards'])
-            print('地主牌为：',game_status['middle_cards'])
-            player3.landlord=True
-            player3.start_turn() #玩家3出牌回合
-            game_status['turn']=player3 #切换到当前回合的玩家
-            return player3
-        else:
-            print('玩家1、2、3都不叫地主，随机选择地主')
-        import random
-        landlord=random.randint(1,3)
-        if landlord==1:
-            player1.in_hand.extend(game_status['middle_cards'])
-            player1.landlord=True
-            
-            game_status['turn']=player1 #切换到当前回合的玩家
-            
-            print('玩家1成为地主')
-        elif landlord==2:
-            player2.in_hand.extend(game_status['middle_cards'])
-            player2.landlord=True
-            
-            game_status['turn']=player2 #切换到当前回合的玩家
-            
-            print('玩家2成为地主')
-        elif landlord==3:
-            player3.in_hand.extend(game_status['middle_cards'])
-            player3.landlord=True
-            
-            game_status['turn']=player3 #切换到当前回合的玩家
-            
-            print('玩家3成为地主')
+    # 剩余3张牌，作为中间牌
+    game_status['middle_cards']=deck.deal(3)
+    #建立玩家手牌类实例
+    player1.hand=Card_inhand(player1.in_hand,(500,600))
+    player2.hand=Card_inhand(player2.in_hand,(200,300),angle=90)
+    player3.hand=Card_inhand(player3.in_hand,(800,600),angle=-90)
+
+    # cardGroup=Group()
+    # #元组和精灵映射
+    # cardSpriteMap={}
+    # for card in d.DeckwithJoker().cards:
+    #     cardSpriteMap[card]=CardImage(card)
+    #     cardGroup.add(cardSpriteMap[card]) #之后通过元组来找到精灵
+
+
+
+
+ 
         
     # player1.ai=False
-    game_status['middle_cards']=deck.deal(3) #中间3张牌
     game_status['landlord']=None #初始时，没有地主
     game_status['last_played_cards']=None #上一个回合出牌的牌
     #叫地主
-    game_status['landlord']=call_landlord() #该函数轮流选地主，产生地主
-   
+    
     game_status['landlord'].start_turn() #地主出牌回合
     # print(game_status['turn'],'这是有效的')
     #地主出完了，下一个回合
@@ -327,7 +367,15 @@ def next_game(game_status:dict):
         print(winner.id,'是赢家')    
     for player in game_status['playerlist']:
         print(f'{player.id}当前分数为：{player.score}')
-#游戏主体       
+
+
+
+       
+       
+       
+
+#游戏主体 
+       
 def start_game():
     class Player: #把玩家的属性和方法封装在一个类中
         def __init__(self,id,ai=True):
@@ -552,69 +600,68 @@ def start_game():
 
                 return combo+combobomb+jokercombo #返回可以出的牌,这是个列表，每个元素是列表，是可以出的牌。    
 
-        def start_turn(self): #开始自己的回合,并选择要出的牌
-           
-          
-            if self.played_cards==game_status['last_played_cards']: #如果自己出的牌和上一个回合出的牌相同，说明是自己打的牌。
-                game_status['last_played_cards']=None   # 自己重新出任意牌       
-            
-            # print(f'玩家{self.id}请选择要出的牌，')
-            #先模拟随便出牌，筛选出可以出的牌
-            possible_cards=self.possible_cards()
-            print(f'{self.id}可以出的牌为：')
-            possible_cards.sort(key=lambda x:len(x)) #按牌型长度排序
-            if possible_cards:    
-                for i in range(len(possible_cards)):
-                    possible_cards[i].sort(key=lambda x:rank_value[x[1]]) #按牌值排序
-                    print(f'{i+1}',possible_cards[i]) #按牌值排序
+        def is_winner(self)->list: #判断当前回合的赢家,如果谁出完了，判断赢家是谁
+            if self.in_hand==[]: 
+                if game_status['landlord']==self: #如果是地主，那么自己出的牌就是赢家
+                    self.score+=10 #地主赢10分
+                    for player in game_status['players']:
+                        if player!=game_status['landlord']:
+                            player.score-=5 #其他玩家输5分
+                    return [self] #返回当前玩家的id
+                else:
+                    winner=[]
+                    game_status['landlord'].score+=10 
+                    for player in game_status['players']:
+                        if player!=game_status['landlord']:
+                            player.score-=5 #其他玩家输5分
+                            winner.append(player) #返回上一个回合的玩家id
+                    return winner
             else:
-                print('没有可以出的牌。')
-            if self.ai == False:
-                if possible_cards:
-                    try:
-                        index=int(input('请选择要出的牌，输入牌型的序号'))
-                    except ValueError:
-                        print('输入错误，默认出第一张牌。')
-                        index=1
-                    if index > len(possible_cards):
-                        print('输入错误，默认出最后一个牌形。')
-                        index=0
-                    self.playing_cards=possible_cards[index-1] 
-                    self.out_card(self.playing_cards)
-                    game_status['last_played_cards']=self.playing_cards #记录刚刚出的牌
-                    print(f'{self.id}出的牌为：',self.playing_cards)
-                    print(f'{self.id}打出的牌形为：',getcardtype(self.playing_cards))
-                    print(f'{self.id}当前手上的牌为：',self.in_hand)
-                    
-
+                return None #这回合没人赢       
+        def start_turn(self): #开始自己的回合,并选择要出的牌
+            if self.ai==False:
+                pass   #如果不是AI玩家，那么需要可视化界面选择要出的牌，进入选牌阶段
+          
+            else:
+                if self.played_cards==game_status['last_played_cards']: #如果自己出的牌和上一个回合出的牌相同，说明是自己打的牌。
+                    game_status['last_played_cards']=None   # 自己重新出任意牌       
+                
+                # print(f'玩家{self.id}请选择要出的牌，')
+                #先模拟随便出牌，筛选出可以出的牌
+                possible_cards=self.possible_cards()
+                print(f'{self.id}可以出的牌为：')
+                possible_cards.sort(key=lambda x:len(x)) #按牌型长度排序
+                if possible_cards:    
+                    for i in range(len(possible_cards)):
+                        possible_cards[i].sort(key=lambda x:rank_value[x[1]]) #按牌值排序
+                        print(f'{i+1}',possible_cards[i]) #按牌值排序
                 else:
                     print('没有可以出的牌。')
-                    self.pass_turn()
-                    return
                 
-            else:
-                if game_status['last_played_cards']!=None:
-                    #先设定玩家随机要不起，后续再改逻辑
-                    if random.randint(0,1)==0:
-                        self.pass_turn()
-                        return
-                    if possible_cards:
-                        self.playing_cards=possible_cards[-1] #选择出第一个牌型
-                        self.out_card(self.playing_cards)
-                        game_status['last_played_cards']=self.playing_cards #记录刚刚出的牌
-                        print(f'{self.id}出的牌为：',self.playing_cards)
-                        print(f'{self.id}打出的牌形为：',getcardtype(self.playing_cards))
+                    
+                if true:
+                    if game_status['last_played_cards']!=None:
+                        #先设定玩家随机要不起，后续再改逻辑
+                        if random.randint(0,1)==0:
+                            self.pass_turn()
+                            return
+                        if possible_cards:
+                            self.playing_cards=possible_cards[-1] #选择出第一个牌型
+                            self.out_card(self.playing_cards)
+                            game_status['last_played_cards']=self.playing_cards #记录刚刚出的牌
+                            print(f'{self.id}出的牌为：',self.playing_cards)
+                            print(f'{self.id}打出的牌形为：',getcardtype(self.playing_cards))
 
+                        else:
+                            self.pass_turn()
+                            return
                     else:
-                        self.pass_turn()
-                        return
-                else:
-                     
-                        self.playing_cards=possible_cards[-1] #选择出第一个牌型
-                        self.out_card(self.playing_cards)
-                        game_status['last_played_cards']=self.playing_cards #记录刚刚出的牌
-                        print(f'{self.id}出的牌为：',self.playing_cards)
-                        print(f'{self.id}打出的牌形为：',getcardtype(self.playing_cards))
+                        
+                            self.playing_cards=possible_cards[-1] #选择出第一个牌型
+                            self.out_card(self.playing_cards)
+                            game_status['last_played_cards']=self.playing_cards #记录刚刚出的牌
+                            print(f'{self.id}出的牌为：',self.playing_cards)
+                            print(f'{self.id}打出的牌形为：',getcardtype(self.playing_cards))
 
             if not self.in_hand: #如果自己手上没牌了，就结束回合
                 if self.landlord:
@@ -630,7 +677,8 @@ def start_game():
                         player.score+=5 #农民胜利，分数增加5
                     game_status['landlord'].score-=10 #地主分数-10    
                     print('农民胜利')
-                
+        def choose_card(self,cards:list): #选择要出的牌
+            self.playing_cards=cards       
 
         def out_card(self,cards): #出牌
             self.played_cards=cards #记录刚刚出的牌
@@ -638,7 +686,11 @@ def start_game():
             for card in cards:
                 # print(f'玩家{self.id}出的牌为：',card)
                 self.in_hand.remove(card)
-      
+        def call_landlord(game_status): #叫地主,先默认自己当地主
+            game_status['landlord']=self
+            game_status['landlord'].in_hand.extend(game_status['middle_cards']) #地主手上的牌加上中间的牌
+            print(f'{game_status['landlord'].id}是地主')
+            game_status['status']='out_card' #叫地主后，进入出牌状态
 
 # 游戏开始
    
@@ -657,6 +709,7 @@ def start_game():
     'turn':None, #当前回合的玩家
     'playerlist':[player1,player2,player3], #玩家列表，方便循环
     'winner':None, #赢家
+    'status':'wait', #游戏状态，开始、叫地主、出牌、结束,wait,start,call_landlord,out_card,end
 }
     #可视化pygame
     GREEN=(0,128,0)
@@ -689,26 +742,69 @@ def start_game():
 
     #创建按钮类
     class Button:
-        def __init__(self,text,pos,font,color=WHITE,bg_color=BLUE):
+        def __init__(self,text,pos,font,color=WHITE,bg_color=BLUE,border_radius=10):
             self.text=text
             self.pos=pos
             self.font=font
             self.color=color
             self.bg_color=bg_color
+            self.border_radius=border_radius
             _,text_rect=font.render(text,color) #渲染了一个矩形获取文字的宽高
             text_width,text_height=text_rect.size
+            self.text_width=text_width
+            self.text_height=text_height
             self.rect=pygame.Rect(pos[0],pos[1],text_width+20,text_height+10)#把Rect实例作为self的属性。
             #Rect的参数是（x,y,width,height）
             #Rect的属性可以通过self.rect.x,self.rect.y,self.rect.width,self.rect.height来访问和修改
+                    # 状态标记（核心：控制视觉效果）
+            self.is_hovered = False  # 是否悬浮
+            self.is_clicked = False  # 是否点击
+
         def draw(self,screen): #绘制按钮的方法
-            pygame.draw.rect(screen,self.bg_color,self.rect) #rect矩形对象绘制，参数是（surface,color,rect）
-            self.font.render_to(screen,self.pos,self.text,self.color)
+            # 按钮颜色根据状态变化
+            #创建一个临时的Rect对象，用于绘制按钮，只用于偏移后绘制，不改变按钮的位置
+            orgin_rect=self.rect.copy()
+            draw_rect=self.rect.copy()
+            draw_rect.x+=4  # 增加水平偏移量
+            draw_rect.y+=4  # 保持垂直偏移量
+            if self.is_clicked:
+                draw_color = self.bg_color  # 点击时使用原始颜色
+                current_rect=draw_rect
+                # 点击时稍微偏移，模拟按下效果
+            elif self.is_hovered:
+                draw_color = (min(255,self.bg_color[0]+50),min(255,self.bg_color[1]+50),min(255,self.bg_color[2]+50))  # 悬浮时颜色更浅
+                current_rect=orgin_rect
+            else:
+                draw_color = self.bg_color  # 正常颜色
+                current_rect=orgin_rect
+            # 先绘制一个稍微大一点的深色阴影，增强按下效果
+            if self.is_clicked:
+                shadow_rect = current_rect.copy()
+                shadow_rect.inflate_ip(4, 4)  # 稍微放大阴影
+                shadow_color = (max(0, self.bg_color[0]-30), max(0, self.bg_color[1]-30), max(0, self.bg_color[2]-30))
+                pygame.draw.rect(screen, shadow_color, shadow_rect, border_radius=self.border_radius)
+            
+            # 绘制按钮主体
+            pygame.draw.rect(screen, draw_color, current_rect, border_radius=self.border_radius)
+            #文字居中，并绘制
+            text_x=current_rect.x+(current_rect.width-self.text_width)//2
+            text_y=current_rect.y+(current_rect.height-self.text_height)//2
+            self.font.render_to(screen,(text_x,text_y),self.text,self.color)
         def click(self,pos):
             if self.rect.collidepoint(pos):
                 return True
             else:
                 return False
-
+        def update(self,mouse_pos,mouse_down):
+            if self.rect.collidepoint(mouse_pos):
+                self.is_hovered=True
+                if mouse_down:
+                    self.is_clicked=True
+                else:
+                    self.is_clicked=False
+            else:
+                self.is_hovered=False
+                self.is_clicked=False
     #开始按钮和重置按钮
     start_button=Button('开始游戏',(screen_width//2,screen_height//2 ),large_font)
     start_status=False #未开始
@@ -719,6 +815,10 @@ def start_game():
     out_button=Button('出牌',(screen_width//2,screen_height//2-100),large_font)
     pass_button=Button('Pass',(screen_width//2,screen_height//2-200),large_font)
 
+
+    #叫地主按钮
+    call_landlord_button=Button('叫地主',(screen_width//2,screen_height//2-300),large_font)
+
     #分数框，这个是要多次渲染的。得放主循环里面，渲染就是把东西先画好放到内存里。
     score_font = pygame.freetype.Font(font_path, 26)
     
@@ -726,10 +826,21 @@ def start_game():
     score_text2_pos=(screen_width//3*2,150)
     score_text3_pos=(screen_width//3*2,200)
 
+        #建立精灵组
+    
+
+ 
+      
+
+  
+
+            
     #游戏主循环
     clock = pygame.time.Clock()
     # 输入框是否激活
     input_active=0
+    # 游戏状态标志
+    start_new_game = False
     # 0表示没有输入框被激活
     # 1表示玩家1的输入框被激活
     # 2表示玩家2的输入框被激活
@@ -747,19 +858,27 @@ def start_game():
     271,                   # 台式机小回车数值（兜底）
     10                     # Linux 换行/回车（兜底）
 )
+    # 游戏主循环
     while True:
+        # 首先处理游戏逻辑 - 如果需要开始新游戏，先在这里执行
+       
+
+
+            
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_down = pygame.mouse.get_pressed()[0]  # 左键是否按下
         for event in pygame.event.get():
             if event.type==pygame.QUIT:
                 pygame.quit()
                 sys.exit()
             if event.type==pygame.MOUSEBUTTONDOWN:
-                if start_button.click(event.pos): #点击开始按钮
-                        start_status=True
-                        next_game(game_status) #开始游戏
-                if next_button.click(event.pos):
+                # 按钮的点击状态由update方法自动处理
+                if start_button.rect.collidepoint(event.pos) and event.button == 1: #点击开始按钮
+                        game_status['status']='start'
+                if next_button.rect.collidepoint(event.pos) and event.button == 1: #点击下一局按钮
                         # 下一局游戏，把除分数外的其他项都归零
-                        next_game(game_status)
-                if reset_button.click(event.pos):
+                        game_status['status']='start'
+                if reset_button.rect.collidepoint(event.pos) and event.button == 1:
                         # 重置游戏，把所有项都归零
                         player1.score=100
                         player2.score=100
@@ -767,8 +886,8 @@ def start_game():
                         player1.id='玩家1'
                         player2.id='玩家2'
                         player3.id='玩家3'
-                        start_status=False
-                if not start_status: #这部分菜单逻辑是在游戏未开始时生效
+                        game_status['status']='wait'
+                if game_status['status']=='wait': #这部分菜单逻辑是在游戏未开始时生效
                    
                     # 点击输入框时激活相应的输入框
                     if input1_rect.collidepoint(event.pos):
@@ -782,6 +901,7 @@ def start_game():
                     else:
                         input_active=0
 
+            # 不需要MOUSEBUTTONUP事件处理，update方法会自动管理点击状态
             if event.type==pygame.KEYDOWN:
                
         
@@ -822,11 +942,41 @@ def start_game():
                     
 
         screen.fill(GREEN)
-        if start_status:
-            next_button.draw(screen)
-            reset_button.draw(screen)
-        else:
+        if game_status['status']=='wait':
             start_button.draw(screen)
+
+
+
+
+
+
+
+
+        if game_status['status']=='start': 
+            next_game(game_status)
+            reset_button.draw(screen)
+            player1.hand.group.draw(screen)
+            player2.hand.group.draw(screen)
+            player3.hand.group.draw(screen)
+            player1.hand.group.update(mouse_pos,mouse_down)
+            player2.hand.group.update(mouse_pos,mouse_down)
+            player3.hand.group.update(mouse_pos,mouse_down)
+            game_status['status']='call_landlord'
+        
+        if game_status['status']=='call_landlord':
+            call_landlord_button.draw(screen)
+
+        if game_status['status']=='out_card':
+            pass_button.draw(screen)
+            out_button.draw(screen)
+        # 更新所有按钮状态
+        start_button.update(mouse_pos,mouse_down)
+        next_button.update(mouse_pos,mouse_down)
+        reset_button.update(mouse_pos,mouse_down)
+        
+      
+
+        
         score_text1,score_text1_rect = score_font.render(f'{player1.id}：{player1.score}', WHITE)
         score_text2,score_text2_rect = score_font.render(f'{player2.id}：{player2.score}', WHITE)
         score_text3,score_text3_rect = score_font.render(f'{player3.id}：{player3.score}', WHITE)
@@ -876,6 +1026,9 @@ def start_game():
         screen.blit(player3_name_text, player3_name_pos)
         
         pygame.display.flip()
+        
+        # 帧渲染已完成，不再在这里执行游戏逻辑
+        # 游戏逻辑已移至主循环开始处，确保UI响应优先
 
         clock.tick(60)
 

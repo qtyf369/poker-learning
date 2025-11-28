@@ -63,15 +63,20 @@ def card_load(card : tuple,scale:tuple[int,int]=(100,150)):
     rank_map={'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':'jack','Q':'queen','K':'king','A':'ace','王':'joker'}
 
     try:
-        card_img=pygame.image.load(f'./cards/{rank_map[r]}_of_{suit_map[s]}.png' )
+        if card==('back',''):
+            #加载牌背图片
+            card_img=pygame.image.load(f'./cards/back.png' )
+        else:
+            #加载牌面图片
+            card_img=pygame.image.load(f'./cards/{rank_map[r]}_of_{suit_map[s]}.png' )
         scale_card_img=pygame.transform.scale(card_img,scale)
         return scale_card_img
     except FileNotFoundError: 
         card_img=pygame.image.load(f'./cards/{suit_map[s]}_{rank_map[r]}.png' )
         scale_card_img=pygame.transform.scale(card_img,scale)
         return scale_card_img
-    except :
-        print(f'没有{rank_map[r]} of {suit_map[s]}这张牌')
+    except Exception as e:
+        print(f'加载牌图片时出错：{type(e).__name__} - {e}')
         return None
 
 # 测试
