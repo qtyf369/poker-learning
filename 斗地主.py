@@ -94,8 +94,7 @@ class CardImage(Sprite):
 class Card_inhand: #手牌排序和位置，每张手牌绑定个精灵
     def __init__(self,cards:list,pos:(int,int),angle=0,order=True,gap=25): #从起始位置向后牌,order等于True时，按牌值从大到小排序
         self.cards=cards
-        print(self.cards,"是空吗")
-        print(cards,"是空吗")
+        
         self.pos=pos
         if order:
             self._inorder()
@@ -143,12 +142,12 @@ class Card_inhand: #手牌排序和位置，每张手牌绑定个精灵
         # self.group.empty()
         # self.group.add(self.sprites)
         self._inorder()
-        print(self.cards,"重要的来了，是空吗")
+        
         self.sprites=[CardImage(card) for card in self.cards] #每个牌绑定个精灵,精灵列表
         self.group.empty()
         self.group.add(self.sprites)
         self.setpos() #刷新牌的位置
-        print(f'刷新后的牌为{self.cards}')
+        
         self._rotate()
         
     def addcards(self,cards:list): #改变手牌后更新实际的牌
@@ -161,7 +160,7 @@ class Card_inhand: #手牌排序和位置，每张手牌绑定个精灵
     def update_cards(self,cards:list): #更新手牌
        
         self.cards=cards
-        print(self.cards,"重要的来了333，是空吗")
+        
         self._refresh()
 
 
@@ -394,7 +393,6 @@ def next_game(game_status:dict): #初始化阶段+发牌
 
     #有玩家手上没牌了，就结束
     # while not game_status['winner']: #如果赢家为空，就继续循环
-    #     game_status['turn']=game_status['playerlist'][(game_status['playerlist'].index(game_status['turn'])+1)%3] #切换到下一个回合的玩家
     #     game_status['turn'].start_turn() #切换到下一个回合的玩家出牌回合
     # for winner in game_status['winner']:
 
@@ -415,7 +413,7 @@ def start_game():
         def __init__(self,id,ai=True):
             self.id=id
             self.in_hand=[] #玩家手中的牌
-            self.playing_cards=[] #正在选的牌，准备出
+            self.playing_cards=[] #正在选的牌，准备出,玩家用
             self.playingsprites=[] #正在选的牌的精灵，准备出
             self.played_cards=[] #刚刚出的牌,已经出过的牌，在牌桌上
             self.landlord=False #是否是地主,默认不是
@@ -424,6 +422,8 @@ def start_game():
         def pass_turn(self): #过牌
             
             print(f'{self.id}选择PASS')
+            game_status['turn']=game_status['playerlist'][(game_status['playerlist'].index(self)+1)%3] #切换到下一个回合的玩家
+            game_status['turn'].start_turn() #开始下一个回合的玩家
         
         #回合开始，切换到出牌回合
         #判断自己选的牌是否比last_played_cards大
@@ -432,7 +432,7 @@ def start_game():
             last=game_status['last_played_cards']
             #重构一下，暴力枚举太慢了。
             #筛选自己的所有牌形，分类看。多张牌的用counter
-            if last==None:
+            if last==[]:
 
             #1.单张
                 possible_single=[[card] for card in self.in_hand]
@@ -636,10 +636,10 @@ def start_game():
                 return combo+combobomb+jokercombo #返回可以出的牌,这是个列表，每个元素是列表，是可以出的牌。    
 
         def is_winner(self)->list: #判断当前回合的赢家,如果谁出完了，判断赢家是谁
-            if self.in_hand==[]: 
+            if self.hand.sprites==[]: 
                 if game_status['landlord']==self: #如果是地主，那么自己出的牌就是赢家
                     self.score+=10 #地主赢10分
-                    for player in game_status['players']:
+                    for player in game_status['playerlist']:
                         if player!=game_status['landlord']:
                             player.score-=5 #其他玩家输5分
                     return [self] 
@@ -652,14 +652,17 @@ def start_game():
                             winner.append(player) #返回上一个回合的玩家id
                     return winner
             else:
-                return None #这回合没人赢       
+                return [] #这回合没人赢       
         def start_turn(self): #开始自己的回合,并选择要出的牌
+            print(f'{self.id}回合开始')
             if self.ai==False: 
                 game_status['status']='out_card' 
+                return
           
             else:#ai不用进入出牌阶段，直接出
+                game_status['status']='AI' #当前状态是AI出牌
                 if self.played_cards==game_status['last_played_cards']: #如果自己出的牌和上一个回合出的牌相同，说明是自己打的牌。
-                    game_status['last_played_cards']=None   # 自己重新出任意牌       
+                    game_status['last_played_cards']=[]   # 自己重新出任意牌       
                 
                 # print(f'玩家{self.id}请选择要出的牌，')
                 #先模拟随便出牌，筛选出可以出的牌
@@ -675,28 +678,29 @@ def start_game():
                 
                     
                 
-                if game_status['last_played_cards']!=None:
-                    #先设定玩家随机要不起，后续再改逻辑
+                if  game_status['last_played_cards']:
+                    #如果之前是有出牌的，先设定玩家随机要不起，后续再改逻辑
                     if random.randint(0,1)==0:
                         self.pass_turn()
                         return
                     if possible_cards:
-                        self.playing_cards=possible_cards[-1] #选择出第一个牌型
-                        self.out_card(self.playing_cards)
-                        game_status['last_played_cards']=self.playing_cards #记录刚刚出的牌
-                        print(f'{self.id}出的牌为：',self.playing_cards)
-                        print(f'{self.id}打出的牌形为：',getcardtype(self.playing_cards))
+                       #Ai没用选择过程，直接用played_cards
+                        self.played_cards=possible_cards[-1] #选择出第一个牌型
+                        self.out_card(self.played_cards)
+                        game_status['turn'].hand.removecards(self.played_cards)
+                        print(f'{self.id}出的牌为：',self.played_cards)
+                        print(f'{self.id}打出的牌形为：',getcardtype(self.played_cards))
 
                     else:
                         self.pass_turn()
                         return
-                else:
+                else: #如果之前没有出牌，那么随机出一张牌
                     
-                        self.playing_cards=possible_cards[-1] #选择出第一个牌型
-                        self.out_card(self.playing_cards)
-                        game_status['last_played_cards']=self.playing_cards #记录刚刚出的牌
-                        print(f'{self.id}出的牌为：',self.playing_cards)
-                        print(f'{self.id}打出的牌形为：',getcardtype(self.playing_cards))
+                        self.played_cards=possible_cards[-1] #选择出第一个牌型
+                        self.out_card(self.played_cards)
+                        game_status['last_played_cards']=self.played_cards #记录刚刚出的牌
+                        print(f'{self.id}出的牌为：',self.played_cards)
+                        print(f'{self.id}打出的牌形为：',getcardtype(self.played_cards))
 
             if not self.in_hand: #如果自己手上没牌了，就结束回合
                 if self.landlord:
@@ -712,6 +716,9 @@ def start_game():
                         player.score+=5 #农民胜利，分数增加5
                     game_status['landlord'].score-=10 #地主分数-10    
                     print('农民胜利')
+            else:
+                game_status['turn']=game_status['playerlist'][(game_status['playerlist'].index(game_status['turn'])+1)%3] #切换到下一个回合的玩家
+                game_status['turn'].start_turn() #开始下一个回合的玩家
         def choose_card(self,cards:list): #选择要出的牌
             self.playing_cards=cards       
 
@@ -946,7 +953,7 @@ def start_game():
                             break
                     if out_button.click(event.pos) and event.button == 1: #点击出牌按钮
                         # 出牌，把选中的牌添加到正在出的牌列表中
-
+                        game_status['turn'].playingsprites.clear()
                         game_status['turn'].playingsprites.extend([card for card in game_status['turn'].hand.sprites if card.selected])
                         # 检查出牌是否符合规则
                         game_status['turn'].playing_cards=[card.card for card in game_status['turn'].playingsprites]
@@ -956,9 +963,24 @@ def start_game():
                         game_status['turn'].hand.removecards(game_status['turn'].playing_cards)
                         game_status['last_played_cards']=game_status['turn'].playing_cards #记录刚刚出的牌，这个要贴在牌桌中间
                         print(f'刚刚出的牌是{game_status["last_played_cards"]}')
-                        #下个玩家出牌
-                        game_status['turn']=game_status['turn'].next_player
+                        #如果出完了，判断赢家
+                        if not game_status['turn'].hand.sprites:
+
+                            winner=game_status['turn'].is_winner() #赢家分数+10
+                            for player in winner:
+                                print(f'{player.id}胜利')
+                               
+                              
+                            
+                        else:
+                            #下个玩家出牌
+                            game_status['turn']=game_status['playerlist'][(game_status['playerlist'].index(game_status['turn'])+1)%3] #切换到下一个回合的玩家
+
                         game_status['turn'].start_turn()
+                        break
+                    if pass_button.click(event.pos) and event.button == 1: #点击过牌按钮
+                        # 过牌，把回合切换到下一个玩家
+                        game_status['turn'].pass_turn()
                         break
             # 不需要MOUSEBUTTONUP事件处理，update方法会自动管理点击状态
             if event.type==pygame.KEYDOWN:
@@ -1029,7 +1051,7 @@ def start_game():
             player2.hand.group.draw(screen)
             player3.hand.group.draw(screen)
             game_status['middle_cards_sprite'].group.draw(screen)
-            print(game_status['last_played_cards'],"重要的来了444，是空吗")
+           
             # game_status['last_played_cards_sprite'].group.update(mouse_pos,mouse_down)
             game_status['last_played_cards_sprite'].update_cards(game_status['last_played_cards'])
             game_status['last_played_cards_sprite'].group.draw(screen)
