@@ -369,8 +369,8 @@ def next_game(game_status:dict): #初始化阶段+发牌
     game_status['middle_cards']=deck.deal(3)
     #建立玩家手牌类实例
     player1.hand=Card_inhand(player1.in_hand,(600,800))
-    player3.hand=Card_inhand(player2.in_hand,(200,300),angle=90)
-    player2.hand=Card_inhand(player3.in_hand,(1300,600),angle=-90)
+    player3.hand=Card_inhand(player3.in_hand,(200,300),angle=90)
+    player2.hand=Card_inhand(player2.in_hand,(1300,600),angle=-90)
     game_status['middle_cards_sprite']=Card_inhand(game_status['middle_cards'],(800,100),order=False,gap=100)
     game_status['last_played_cards_sprite']=Card_inhand(game_status['last_played_cards'],(800,500)) #牌桌上的牌
     # cardGroup=Group()
@@ -723,13 +723,17 @@ def start_game():
             self.playing_cards=cards       
 
         def out_card(self,cards): #出牌
-            self.played_cards=cards #记录刚刚出的牌
+            # self.played_cards=cards #记录刚刚出的牌
             game_status['last_played_cards']=cards #记录刚刚出的牌，这个要贴在牌桌中间
             # print(f'玩家{self.id}出的牌群为：',cards)
             for card in cards:
                 # print(f'玩家{self.id}出的牌为：',card)
                 self.in_hand.remove(card)
-            self.playing_cards=[]   # 出牌后清空正在出的牌
+            self.hand.update_cards(self.in_hand)
+            print(f'牌桌上的牌为：',game_status['last_played_cards'])
+              
+            # self.playing_cards=[]   # 出牌后清空正在出的牌，这个变量ai似乎用不到，
+
         def call_landlord(self): #叫地主,先默认自己当地主
             game_status['landlord']=self
             # game_status['landlord'].in_hand.extend(game_status['middle_cards']) #地主手上的牌加上中间的牌
