@@ -7,6 +7,7 @@
 #7.AI出牌逻辑：自己出优先出单张。别人出，有大牌就压。
 #可视化：牌桌上显示当前在出的牌，玩家手中看到自己的牌，叠放。其他人的牌只显示背面。显示：开始按钮，下一局按钮。分数，出版记录。
 # from termios import FF0
+from math import trunc
 import stat
 from typing import Any
 import pygame
@@ -21,7 +22,6 @@ import deck as d
 import sys
 import os
 from pygame.sprite import Sprite,Group
-
 
 #定义常量
 #定义颜色
@@ -418,7 +418,10 @@ def start_game():
             self.played_cards=[] #刚刚出的牌,已经出过的牌，在牌桌上
             self.landlord=False #是否是地主,默认不是
             self.ai=ai #是否是AI玩家,默认是
+            self.ai_delay=1 #AI玩家的延迟，默认1秒
+            self.ai_thinking=False #AI玩家是否正在思考，默认不是
             self.score=100 #玩家的分数，默认100
+            self.ai_time=0 #AI玩家思考时间，默认0秒
         def pass_turn(self): #过牌
             
             print(f'{self.id}选择PASS')
@@ -645,10 +648,10 @@ def start_game():
                     return [self] 
                 else:
                     winner=[]
-                    game_status['landlord'].score+=10 
-                    for player in game_status['players']:
+                    game_status['landlord'].score-=10 
+                    for player in game_status['playerlist']:
                         if player!=game_status['landlord']:
-                            player.score-=5 #其他玩家输5分
+                            player.score+=5 #其他玩家赢5分
                             winner.append(player) #返回上一个回合的玩家id
                     return winner
             else:
@@ -661,6 +664,10 @@ def start_game():
           
             else:#ai不用进入出牌阶段，直接出
                 game_status['status']='AI' #当前状态是AI出牌
+                # self.ai_thinking=True #AI玩家正在思考
+                # self.ai_time=pygame.time.get_ticks() #AI玩家思考时间
+                
+                
                 if self.played_cards==game_status['last_played_cards']: #如果自己出的牌和上一个回合出的牌相同，说明是自己打的牌。
                     game_status['last_played_cards']=[]   # 自己重新出任意牌       
                 
@@ -683,7 +690,7 @@ def start_game():
                     if random.randint(0,1)==0:
                         self.pass_turn()
                         return
-                    if possible_cards:
+                if possible_cards:
                        #Ai没用选择过程，直接用played_cards
                         self.played_cards=possible_cards[-1] #选择出第一个牌型
                         self.out_card(self.played_cards)
@@ -691,16 +698,16 @@ def start_game():
                         print(f'{self.id}出的牌为：',self.played_cards)
                         print(f'{self.id}打出的牌形为：',getcardtype(self.played_cards))
 
-                    else:
+                else:
                         self.pass_turn()
                         return
-                else: #如果之前没有出牌，那么随机出一张牌
+                # else: #如果之前没有出牌，那么随机出一张牌
                     
-                        self.played_cards=possible_cards[-1] #选择出第一个牌型
-                        self.out_card(self.played_cards)
-                        game_status['last_played_cards']=self.played_cards #记录刚刚出的牌
-                        print(f'{self.id}出的牌为：',self.played_cards)
-                        print(f'{self.id}打出的牌形为：',getcardtype(self.played_cards))
+                        # self.played_cards=possible_cards[-1] #选择出第一个牌型
+                        # self.out_card(self.played_cards)
+                        # game_status['last_played_cards']=self.played_cards #记录刚刚出的牌
+                        # print(f'{self.id}出的牌为：',self.played_cards)
+                        # print(f'{self.id}打出的牌形为：',getcardtype(self.played_cards))
 
             if not self.in_hand: #如果自己手上没牌了，就结束回合
                 if self.landlord:
@@ -718,7 +725,11 @@ def start_game():
                     print('农民胜利')
             else:
                 game_status['turn']=game_status['playerlist'][(game_status['playerlist'].index(game_status['turn'])+1)%3] #切换到下一个回合的玩家
-                game_status['turn'].start_turn() #开始下一个回合的玩家
+                if game_status['turn'].ai==False: #如果下一个回合的玩家不是AI玩家，就开始，如果是，要先思考。
+                    game_status['turn'].start_turn() #开始下一个回合的玩家
+                else:
+                    game_status['turn'].ai_thinking=True #AI玩家开始思考
+                    game_status['turn'].ai_time=pygame.time.get_ticks() #AI玩家思考时间
         def choose_card(self,cards:list): #选择要出的牌
             self.playing_cards=cards       
 
@@ -736,6 +747,7 @@ def start_game():
 
         def call_landlord(self): #叫地主,先默认自己当地主
             game_status['landlord']=self
+            self.landlord=True
             # game_status['landlord'].in_hand.extend(game_status['middle_cards']) #地主手上的牌加上中间的牌
             print(f'{game_status['landlord'].id}是地主')
             
@@ -857,8 +869,8 @@ def start_game():
     #开始按钮和重置按钮
     start_button=Button('开始游戏',(screen_width//2,screen_height//2 ),large_font)
     start_status=False #未开始
-    next_button=Button('下一局游戏',(screen_width-300,screen_height//2-400),large_font)
-    reset_button=Button('重置游戏',(screen_width-300,screen_height//2-300),large_font)
+    next_button=Button('下一局游戏',(screen_width-400,screen_height//2-400),large_font)
+    reset_button=Button('重置游戏',(screen_width-400,screen_height//2-300),large_font)
 
     #出牌按钮和Pass按钮
     out_button=Button('出牌',(screen_width//2,screen_height//2-100),large_font)
@@ -875,8 +887,7 @@ def start_game():
     score_text2_pos=(screen_width//3*2,150)
     score_text3_pos=(screen_width//3*2,200)
 
-      
-  
+ 
 
             
     #游戏主循环
@@ -970,8 +981,8 @@ def start_game():
                         #如果出完了，判断赢家
                         if not game_status['turn'].hand.sprites:
 
-                            winner=game_status['turn'].is_winner() #赢家分数+10
-                            for player in winner:
+                            game_status['winner']=game_status['turn'].is_winner() #赢家分数+10
+                            for player in game_status['winner']:    
                                 print(f'{player.id}胜利')
                                
                               
@@ -979,13 +990,17 @@ def start_game():
                         else:
                             #下个玩家出牌
                             game_status['turn']=game_status['playerlist'][(game_status['playerlist'].index(game_status['turn'])+1)%3] #切换到下一个回合的玩家
-
-                        game_status['turn'].start_turn()
-                        break
+                            if game_status['turn'].ai==False: #如果下一个回合的玩家不是AI玩家，就开始，如果是，要先思考。
+                                game_status['turn'].start_turn()
+                            else:
+                                game_status['turn'].ai_thinking=True #AI玩家开始思考
+                                game_status['turn'].ai_time=pygame.time.get_ticks() #AI玩家思考时间
+                        
                     if pass_button.click(event.pos) and event.button == 1: #点击过牌按钮
                         # 过牌，把回合切换到下一个玩家
-                        game_status['turn'].pass_turn()
-                        break
+                        if game_status['last_played_cards']: #确保自己不是要出牌的人。
+                            game_status['turn'].pass_turn()
+                        
             # 不需要MOUSEBUTTONUP事件处理，update方法会自动管理点击状态
             if event.type==pygame.KEYDOWN:
                
@@ -1036,6 +1051,12 @@ def start_game():
         for button in buttons:
             button.update(mouse_pos,mouse_down)
        
+        
+        if game_status['turn'] and game_status['turn'].ai==True: #如果当前回合的玩家是AI玩家，才需要思考
+            current_time=pygame.time.get_ticks() #当前时间
+            if game_status['turn'].ai_thinking and current_time-game_status['turn'].ai_time>=game_status['turn'].ai_delay*1000: #如果AI玩家思考时间超过了延迟时间，说明AI玩家思考完成
+                game_status['turn'].ai_thinking=False #AI玩家思考完成
+                game_status['turn'].start_turn() #开始下一个回合的玩家
 
 
 
@@ -1045,7 +1066,6 @@ def start_game():
 
         if game_status['status']=='start': 
             next_game(game_status)
-            reset_button.draw(screen)
 
         if  not game_status['status']=='wait': 
             player1.hand.group.update(mouse_pos,mouse_down)
@@ -1059,6 +1079,9 @@ def start_game():
             # game_status['last_played_cards_sprite'].group.update(mouse_pos,mouse_down)
             game_status['last_played_cards_sprite'].update_cards(game_status['last_played_cards'])
             game_status['last_played_cards_sprite'].group.draw(screen)
+            reset_button.draw(screen)
+            next_button.draw(screen)
+
             
         
         if game_status['status']=='call_landlord':
@@ -1119,6 +1142,12 @@ def start_game():
         screen.blit(player2_name_text, player2_name_pos)    
         screen.blit(player3_name_text, player3_name_pos)
         
+           #获胜玩家宣布
+        if game_status['winner']:
+            winner_text_pos=(screen_width//2-100,screen_height//2)
+            winner_ids=[player.id for player in game_status['winner']]
+            large_font.render_to(screen,winner_text_pos,f'游戏结束，{",".join(winner_ids)}胜利',(255,255,255))  
+  
         pygame.display.flip()
         
         # 帧渲染已完成，不再在这里执行游戏逻辑
