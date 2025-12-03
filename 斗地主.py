@@ -92,7 +92,7 @@ class CardImage(Sprite):
         else :
             self.rect.topleft=self.basepos #回到初始位置
 class Card_inhand: #手牌排序和位置，每张手牌绑定个精灵
-    def __init__(self,cards:list,pos:(int,int),angle=0,order=True,gap=25): #从起始位置向后牌,order等于True时，按牌值从大到小排序
+    def __init__(self,cards:list,pos:(int,int),angle=0,order=True,gap=25,ai=False): #从起始位置向后牌,order等于True时，按牌值从大到小排序
         self.cards=cards
         
         self.pos=pos
@@ -101,7 +101,10 @@ class Card_inhand: #手牌排序和位置，每张手牌绑定个精灵
         self.sprites=[CardImage(card) for card in cards] #每个牌绑定个精灵,精灵列表
         self.group=Group(self.sprites) #将所有牌绑定个精灵组
         self.gap=gap
-        
+        self.ai=ai
+        if self.ai:
+            for sprite in self.sprites:
+                sprite.face_up=False
         
         
         #牌的旋转角度
@@ -162,6 +165,21 @@ class Card_inhand: #手牌排序和位置，每张手牌绑定个精灵
         self.cards=cards
         
         self._refresh()
+class Alarm_Clock(): #闹钟类
+    def __init__(self,pos:tuple=(0,0),scale=(50,50)): #默认10秒
+        self.time=10
+        self.activated=False #是否激活
+        self.pos=pos
+        self.scale=scale
+        self.image=pygame.image.load('pics/alarm_clock.png')
+        self.image=pygame.transform.scale(self.image,self.scale)
+        self.rect=self.image.get_rect()
+        self.rect.topleft=self.pos
+        self.activated=False #是否激活
+    def draw(self,screen): #绘制闹钟
+        if self.activated:
+            screen.blit(self.image,self.rect) #第二个参数只提供坐标
+        
 
 
 
@@ -368,11 +386,11 @@ def next_game(game_status:dict): #初始化阶段+发牌
     # 剩余3张牌，作为中间牌
     game_status['middle_cards']=deck.deal(3)
     #建立玩家手牌类实例
-    player1.hand=Card_inhand(player1.in_hand,(600,800))
-    player3.hand=Card_inhand(player3.in_hand,(200,300),angle=90)
-    player2.hand=Card_inhand(player2.in_hand,(1300,600),angle=-90)
-    game_status['middle_cards_sprite']=Card_inhand(game_status['middle_cards'],(800,100),order=False,gap=100)
-    game_status['last_played_cards_sprite']=Card_inhand(game_status['last_played_cards'],(800,500)) #牌桌上的牌
+    player1.hand=Card_inhand(player1.in_hand,(600,800),ai=player1.ai)
+    player3.hand=Card_inhand(player3.in_hand,(200,300),angle=90,ai=player3.ai)
+    player2.hand=Card_inhand(player2.in_hand,(1300,600),angle=-90,ai=player2.ai)
+    game_status['middle_cards_sprite']=Card_inhand(game_status['middle_cards'],(700,100),order=False,gap=100)
+    game_status['last_played_cards_sprite']=Card_inhand(game_status['last_played_cards'],(800,500),ai=True) #牌桌上的牌
     # cardGroup=Group()
     # #元组和精灵映射
     # cardSpriteMap={}
@@ -422,6 +440,7 @@ def start_game():
             self.ai_thinking=False #AI玩家是否正在思考，默认不是
             self.score=100 #玩家的分数，默认100
             self.ai_time=0 #AI玩家思考时间，默认0秒
+            self.alarm_clock=None #后续通过新建实例时绑定
         def pass_turn(self): #过牌
             
             print(f'{self.id}选择PASS')
@@ -659,7 +678,9 @@ def start_game():
         def start_turn(self): #开始自己的回合,并选择要出的牌
             print(f'{self.id}回合开始')
             if self.ai==False: 
-                game_status['status']='out_card' 
+                game_status['status']='out_card'
+                if self.played_cards==game_status['last_played_cards']: #如果自己出的牌和上一个回合出的牌相同，说明是自己打的牌。
+                    game_status['last_played_cards']=[]   # 清空牌桌 
                 return
           
             else:#ai不用进入出牌阶段，直接出
@@ -708,7 +729,7 @@ def start_game():
                         # game_status['last_played_cards']=self.played_cards #记录刚刚出的牌
                         # print(f'{self.id}出的牌为：',self.played_cards)
                         # print(f'{self.id}打出的牌形为：',getcardtype(self.played_cards))
-
+            
             if not self.in_hand: #如果自己手上没牌了，就结束回合
                 if self.landlord:
                     game_status['winner']=[self] #记录赢家
@@ -755,9 +776,9 @@ def start_game():
 # 游戏开始
    
     
-    player1=Player('玩家1')
-    player2=Player('玩家2')
-    player3=Player('玩家3')
+    player1=Player('玩家1',ai=False)
+    player2=Player('玩家2',ai=True)
+    player3=Player('玩家3',ai=True)
     #用字典记录游戏状态，框架
     game_status={
     'player1.in_hand':player1.in_hand,
@@ -869,8 +890,8 @@ def start_game():
     #开始按钮和重置按钮
     start_button=Button('开始游戏',(screen_width//2,screen_height//2 ),large_font)
     start_status=False #未开始
-    next_button=Button('下一局游戏',(screen_width-400,screen_height//2-400),large_font)
-    reset_button=Button('重置游戏',(screen_width-400,screen_height//2-300),large_font)
+    next_button=Button('下一局游戏',(screen_width-300,screen_height//2-500),large_font)
+    reset_button=Button('重置游戏',(screen_width-300,screen_height//2-420),large_font)
 
     #出牌按钮和Pass按钮
     out_button=Button('出牌',(screen_width//2,screen_height//2-100),large_font)
@@ -883,13 +904,22 @@ def start_game():
     #分数框，这个是要多次渲染的。得放主循环里面，渲染就是把东西先画好放到内存里。
     score_font = pygame.freetype.Font(font_path, 26)
     
+    #玩家姓名位置是固定的。
+    player1_name_pos=(350, 900)
+    player2_name_pos=(1500, 500)    
+    player3_name_pos=(50, 500)
+
     score_text1_pos=(screen_width//3*2,100)
     score_text2_pos=(screen_width//3*2,150)
     score_text3_pos=(screen_width//3*2,200)
-
+    player1.alarm_clock=Alarm_Clock((player1_name_pos[0],player1_name_pos[1]-50))
+    player2.alarm_clock=Alarm_Clock((player2_name_pos[0],player2_name_pos[1]-50))
+    player3.alarm_clock=Alarm_Clock((player3_name_pos[0],player3_name_pos[1]-50))
  
 
-            
+
+
+    #把新建实例的逻辑都写在这上面        
     #游戏主循环
     clock = pygame.time.Clock()
     # 输入框是否激活
@@ -977,6 +1007,7 @@ def start_game():
                             continue
                         game_status['turn'].hand.removecards(game_status['turn'].playing_cards)
                         game_status['last_played_cards']=game_status['turn'].playing_cards #记录刚刚出的牌，这个要贴在牌桌中间
+                        game_status['turn'].played_cards=game_status['last_played_cards']#记录自己上一次出的牌。
                         print(f'刚刚出的牌是{game_status["last_played_cards"]}')
                         #如果出完了，判断赢家
                         if not game_status['turn'].hand.sprites:
@@ -1081,8 +1112,12 @@ def start_game():
             game_status['last_played_cards_sprite'].group.draw(screen)
             reset_button.draw(screen)
             next_button.draw(screen)
-
-            
+            for player in [player1,player2,player3]:
+                if player==game_status['turn']:
+                    player.alarm_clock.activated=True
+                else:
+                    player.alarm_clock.activated=False
+                player.alarm_clock.draw(screen)
         
         if game_status['status']=='call_landlord':
             call_landlord_button.draw(screen)
@@ -1104,13 +1139,12 @@ def start_game():
         screen.blit(score_text2,score_text2_pos)
         screen.blit(score_text3,score_text3_pos)
         
-        #渲染并绘制输入框中的文本
-        font.render_to(screen, (input1_rect.x+5, input1_rect.y+5), input_text1, BLACK)
-        font.render_to(screen, (input2_rect.x+5, input2_rect.y+5), input_text2, BLACK)
-        font.render_to(screen, (input3_rect.x+5, input3_rect.y+5), input_text3, BLACK)
+        #渲染并绘制输入框中的文本,只在wait状态下显示
+        if game_status['status']=='wait':
+            font.render_to(screen, (input1_rect.x+5, input1_rect.y+5), input_text1, BLACK)
+            font.render_to(screen, (input2_rect.x+5, input2_rect.y+5), input_text2, BLACK)
+            font.render_to(screen, (input3_rect.x+5, input3_rect.y+5), input_text3, BLACK)
 
-        # 绘制输入框边上的标签，游戏开始后不显示
-        if not start_status:
             screen.blit(input1_label, input1_label_pos)
             screen.blit(input2_label, input2_label_pos)
             screen.blit(input3_label, input3_label_pos)
@@ -1128,9 +1162,7 @@ def start_game():
         player1_name_text,player1_name_rect = font.render(player1_name,  WHITE)
         player2_name_text,player2_name_rect = font.render(player2_name,  WHITE)
         player3_name_text,player3_name_rect = font.render(player3_name,  WHITE)
-        player1_name_pos=(800, 900)
-        player2_name_pos=(1500, 500)    
-        player3_name_pos=(50, 500)
+        
         # 分数框
         # score_rect=pygame.Rect(500,50,200,100)
         # pygame.draw.rect(screen,WHITE,score_rect)
@@ -1144,10 +1176,12 @@ def start_game():
         
            #获胜玩家宣布
         if game_status['winner']:
-            winner_text_pos=(screen_width//2-100,screen_height//2)
+            winner_text_pos=(screen_width//2-200,screen_height//2)
             winner_ids=[player.id for player in game_status['winner']]
-            large_font.render_to(screen,winner_text_pos,f'游戏结束，{",".join(winner_ids)}胜利',(255,255,255))  
-  
+            if len(game_status['winner'])>1:
+                large_font.render_to(screen,winner_text_pos,f'游戏结束，农民胜出。{",".join(winner_ids)}胜利',BLACK,antialias=False)  
+            else:
+                large_font.render_to(screen,winner_text_pos,f'游戏结束，地主胜出。{winner_ids[0]}胜利',BLACK)  
         pygame.display.flip()
         
         # 帧渲染已完成，不再在这里执行游戏逻辑
